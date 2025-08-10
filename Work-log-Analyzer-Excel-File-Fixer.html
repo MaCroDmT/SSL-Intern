@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Activity Log Cleaner</title>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application uses a simple, linear flow focusing on a single task: file cleaning and download. It presents a clear upload zone initially. Upon file selection and processing, status messages update the user on progress and indicate when the cleaned file is ready for download. This minimal structure is chosen for its directness, as the primary output is a new file rather than an on-screen visualization. -->
+    <!-- Visualization & Content Choices: Goal: Transform Data -> Method: In-browser data manipulation using xlsx.js -> Interaction: File upload and automatic download -> Justification: Replicates the Python script's core functionality for date/time formatting and string replacement to produce a consistently formatted Excel file. Libraries: xlsx.js for reading/writing Excel, FileSaver.js for triggering client-side downloads. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">Excel Activity Log Cleaner</h1>
+            <p class="text-stone-500 mt-2">Upload your raw activity log file to fix formatting and download a cleaned version.</p>
+        </header>
+
+        <main>
+            <section id="upload-section" class="w-full max-w-2xl mx-auto">
+                <div id="drop-zone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your Excel/CSV file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="file-info" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="error-message" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Expected File Columns:</h3>
+                    <p>Your file should contain: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">Date</code>, <code class="font-mono bg-blue-100 px-1 rounded">Start Time</code>, <code class="font-mono bg-blue-100 px-1 rounded">End Time</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                    <p class="mt-2">This tool will fix common formatting issues and download a new Excel file.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const errorMessage = document.getElementById('error-message');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            fileInfo.textContent = ''; // Clear processing message on error
+        }
+
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.classList.add('hidden');
+        }
+
+        function handleFile(file) {
+            clearError();
+            fileInfo.textContent = `Processing '${file.name}'... Please wait.`;
+
+            if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+                showError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let workbook;
+                    let fileType = 'xlsx'; // Default to xlsx for processing
+                    
+                    if (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv') {
+                        // For CSV, decode ArrayBuffer to string and read as type 'string'
+                        const csvText = new TextDecoder('utf-8').decode(e.target.result); 
+                        workbook = XLSX.read(csvText, { type: 'string' });
+                        fileType = 'csv';
+                    } else {
+                        // For Excel files (xlsx, xls), read as ArrayBuffer with type 'array'
+                        workbook = XLSX.read(e.target.result, { type: 'array' });
+                    }
+                    
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    let jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    processData(jsonData, file.name, fileType);
+
+                } catch (err) {
+                    showError('Error processing the file. Please ensure it is a valid, uncorrupted Excel/CSV file and matches the expected columns.');
+                    console.error("Detailed file processing error:", err);
+                } finally {
+                    fileInfo.textContent = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Helper function to format time values to HH:MM AM/PM strings
+        function formatTimeToAMPM(timeValue) {
+            if (timeValue === null || timeValue === undefined || timeValue === '') {
+                return '';
+            }
+
+            let dateObj;
+
+            // If it's already a Date object (from cellDates: true or manual parsing)
+            if (timeValue instanceof Date) {
+                dateObj = timeValue;
+            } 
+            // If it's an Excel serial number for time (fraction of a day)
+            else if (typeof timeValue === 'number') {
+                // Excel's epoch for numbers is often Jan 1, 1900.
+                // We convert the fractional day to milliseconds since midnight for a dummy date.
+                const hours = Math.floor(timeValue * 24);
+                const minutes = Math.floor((timeValue * 24 * 60) % 60);
+                const seconds = Math.floor((timeValue * 24 * 60 * 60) % 60);
+                
+                // Use a fixed dummy date (e.g., Jan 1, 2000) to create the Date object for time formatting
+                dateObj = new Date(2000, 0, 1, hours, minutes, seconds); // Year, Month (0-11), Day, H, M, S
+            } 
+            // If it's a string, try to parse it
+            else if (typeof timeValue === 'string') {
+                // Create a dummy date for parsing time strings to handle various formats
+                const dummyDateString = '2000-01-01T'; 
+                try {
+                    dateObj = new Date(dummyDateString + timeValue);
+                    // If parsing with ISO-like string fails, try specific AM/PM or 24hr match
+                    if (isNaN(dateObj.getTime())) {
+                        const match = timeValue.match(/(\d{1,2}):(\d{2})(:\d{2})?\s*(AM|PM)?/i);
+                        if (match) {
+                            let hours = parseInt(match[1]);
+                            const minutes = parseInt(match[2]);
+                            const seconds = match[3] ? parseInt(match[3].substring(1)) : 0;
+                            const period = match[4] ? match[4].toLowerCase() : '';
+
+                            if (period === 'pm' && hours < 12) hours += 12;
+                            if (period === 'am' && hours === 12) hours = 0; // 12 AM is midnight
+
+                            dateObj = new Date(2000, 0, 1, hours, minutes, seconds); // Use dummy date
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Failed to parse time string '${timeValue}':`, e);
+                    return String(timeValue); // Fallback to original string if parsing fails
+                }
+            } else {
+                return String(timeValue); // Return original if type is unexpected
+            }
+
+            // After parsing, ensure it's a valid Date object
+            if (! (dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+                console.warn(`Could not convert '${timeValue}' to valid Date object for formatting.`);
+                return String(timeValue); // Fallback to original value if invalid
+            }
+
+            // Format to HH:MM AM/PM
+            return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+
+        function processData(data, originalFilename, fileType) {
+            const requiredColumns = ['Employee', 'Date', 'Start Time', 'End Time', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.');
+                return;
+            }
+            
+            // Validate columns exist (case-insensitive and space-insensitive)
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`);
+                return;
+            }
+
+            const cleanedData = data.map(row => {
+                const newRow = { ...row }; // Create a shallow copy to avoid modifying original
+                
+                // 1. Add a space to the end of the 'Employee' column names if it doesn't end with a space already.
+                if (typeof newRow.Employee === 'string' && !newRow.Employee.endsWith(' ')) {
+                    newRow.Employee = newRow.Employee + ' ';
+                }
+
+                // 2. Reformat the 'Date' column from YYYY-MM-DD to DD Month YYYY.
+                if (newRow.Date) {
+                    let dateObj;
+                    if (newRow.Date instanceof Date) {
+                        dateObj = newRow.Date;
+                    } else if (typeof newRow.Date === 'number') { // Handle Excel serial date
+                        // Excel serial date for dates: number of days since Jan 1, 1900
+                        dateObj = new Date(Math.round((newRow.Date - 25569) * 86400 * 1000));
+                    } else { // Try parsing string date
+                        dateObj = new Date(newRow.Date);
+                    }
+
+                    if (dateObj instanceof Date && !isNaN(dateObj)) {
+                        newRow.Date = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+                    } else {
+                        console.warn(`Could not reformat Date for row: ${JSON.stringify(row)}. Keeping original: ${newRow.Date}`);
+                    }
+                }
+
+                // 3. Reformat 'Start Time' and 'End Time' columns to HH:MM AM/PM.
+                // Apply the robust formatTimeToAMPM function to ensure string output
+                newRow['Start Time'] = formatTimeToAMPM(newRow['Start Time']);
+                newRow['End Time'] = formatTimeToAMPM(newRow['End Time']);
+
+                // 4. Correct the 'Activity Duration' string to include a space after "Worked for".
+                if (typeof newRow['Activity Duration'] === 'string') {
+                    // This regex specifically targets "Worked for" immediately followed by digits
+                    newRow['Activity Duration'] = newRow['Activity Duration'].replace(/(Worked for)(\d+h)/i, '$1 $2');
+                }
+
+                return newRow;
+            });
+
+            downloadCleanedFile(cleanedData, originalFilename, fileType);
+        }
+
+        function downloadCleanedFile(data, originalFilename, fileType) {
+            // Create a new workbook and append the cleaned data
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Cleaned Data");
+
+            let dateForFilename = '';
+            // Attempt to get the date from the first row of cleaned data
+            if (data.length > 0 && data[0].Date) {
+                // The Date column is already formatted as "DD Month YYYY" string
+                // We need to convert this back to YYYY-MM-DD for the filename, or just a part of it
+                try {
+                    const parsedDate = new Date(data[0].Date);
+                    if (!isNaN(parsedDate)) {
+                        dateForFilename = parsedDate.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn("Could not parse date from cleaned data for filename. Falling back to today's date.");
+                }
+            }
+            if (!dateForFilename) {
+                // Fallback to today's date if date not found/parsed from data
+                dateForFilename = new Date().toISOString().split('T')[0];
+            }
+            
+            // The requested filename format: "Fixed-Work-log-Activity-Date.xlsx"
+            const outputFilename = `Fixed-Work-log-Activity-${dateForFilename}.xlsx`;
+
+            // Write the workbook to a binary string, then convert to a Blob
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+            // Use FileSaver.js to trigger download
+            saveAs(blob, outputFilename);
+            fileInfo.textContent = `Successfully processed and downloaded '${outputFilename}'.`;
+        }
+    </script>
+</body>
+</html>

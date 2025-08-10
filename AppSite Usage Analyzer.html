@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App/Site Usage Analyzer</title>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: This single-page application is structured around a clear workflow: upload, process, visualize. The main UI features a prominent file upload area. Upon successful file processing, this area is replaced by a dynamic grid of individual employee analysis cards. Each card presents a comprehensive daily overview for one employee, featuring a descriptive summary, a pie chart for percentage distribution, and a bar chart for absolute hours. This modular, card-based approach allows users to quickly scan and dive into specific employee data, prioritizing clarity and ease of access for daily app/site usage insights. -->
+    <!-- Visualization & Content Choices: Goal: Proportion (App Usage) -> Method: Pie Chart -> Interaction: Hover to see percentage -> Justification: Clearly shows the proportional breakdown of time across different applications for a single employee. Goal: Quantity (Hours per App) -> Method: Bar Chart -> Interaction: Visual comparison of hours -> Justification: Provides a direct comparison of absolute time spent on each application, highlighting most-used apps. Goal: Detail (Percentages) -> Method: HTML List/Table -> Interaction: Static display -> Justification: Offers precise numerical percentages of app usage. Libraries: xlsx.js for robust data parsing, Chart.js for flexible and responsive canvas-based charting, and jsPDF with html2canvas for generating comprehensive, portable PDF reports for each employee. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* Max width for chart to avoid stretching */
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px; /* Base height for chart */
+            max-height: 350px; /* Max height for chart */
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 300px; /* Adjust height for larger screens */
+            }
+        }
+        .pie-chart-container {
+            height: 250px; /* Specific height for pie chart to ensure readability */
+            max-height: 300px;
+        }
+        @media (min-width: 768px) {
+            .pie-chart-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">App/Site Usage Analyzer</h1>
+            <p class="text-stone-500 mt-2">Upload your Excel/CSV file to visualize and analyze employee app and site usage.</p>
+        </header>
+
+        <main>
+            <section id="upload-section" class="w-full max-w-2xl mx-auto">
+                <div id="drop-zone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="file-info" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="error-message" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Required Excel/CSV Format:</h3>
+                    <p>Your file must contain the following columns: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">App/Site Name</code>, <code class="font-mono bg-blue-100 px-1 rounded">Status</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                    <p class="mt-2">The analysis date will be inferred from the filename (e.g., "09-Aug" from "workfolio-apps-usage-09-Aug.xlsx") or default to today's date if not found.</p>
+                </div>
+            </section>
+
+            <section id="results-section" class="mt-12">
+                <div id="results-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <template id="result-card-template">
+        <div class="result-card bg-white p-6 rounded-xl shadow-md border border-stone-200">
+            <h2 class="text-xl font-bold text-stone-800 mb-1 employee-name"></h2>
+            <p class="text-sm text-stone-500 mb-4 report-date"></p>
+            
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">App Usage Distribution (%)</h3>
+                <div class="pie-chart-container">
+                    <canvas class="pie-chart"></canvas>
+                </div>
+                <ul class="mt-4 text-sm app-percentage-list divide-y divide-stone-100 border-t border-b border-stone-100 rounded">
+                    <!-- App percentages will be inserted here -->
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">App Usage Hours</h3>
+                <div class="chart-container">
+                    <canvas class="bar-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const errorMessage = document.getElementById('error-message');
+        const resultsGrid = document.getElementById('results-grid');
+        const resultCardTemplate = document.getElementById('result-card-template');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.classList.add('hidden');
+        }
+
+        // Function to parse duration from "00h 00m 00s" or "00h 00m" strings
+        function parseDurationString(durationStr) {
+            if (typeof durationStr !== 'string' || durationStr.trim() === '') {
+                return 0;
+            }
+            const match = durationStr.match(/(\d+)\s*h\s*(\d+)\s*m(?:\s*(\d+)\s*s)?/i);
+            if (match) {
+                const hours = parseInt(match[1] || 0);
+                const minutes = parseInt(match[2] || 0);
+                const seconds = parseInt(match[3] || 0);
+                return hours + (minutes / 60) + (seconds / 3600);
+            }
+            return 0; // Return 0 if duration string cannot be parsed
+        }
+
+        function extractDateFromFilename(filename) {
+            // Regex to find YYYY-MM-DD or DD-MMM patterns
+            let dateMatch = filename.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/i);
+            if (dateMatch) {
+                let datePart = dateMatch[0];
+                // If it's DD-MMM (e.g., 09-Aug), try to convert to YYYY-MM-DD for consistency
+                if (datePart.includes('-') && !datePart.match(/^\d{4}/)) {
+                    const year = new Date().getFullYear(); // Assume current year if not specified
+                    const [day, monthStr] = datePart.split('-');
+                    const monthMap = {
+                        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+                        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+                    };
+                    const monthNum = monthMap[monthStr.toLowerCase()];
+                    if (monthNum) {
+                        return `${year}-${monthNum}-${String(day).padStart(2, '0')}`;
+                    }
+                }
+                // For YYYY-MM-DD or other formats directly parsable by Date
+                try {
+                    const d = new Date(datePart);
+                    if (!isNaN(d)) {
+                        return d.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn("Could not parse date from filename using Date object:", datePart);
+                }
+            }
+            // Fallback to today's date if no date found in filename
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function handleFile(file) {
+            clearError();
+            resultsGrid.innerHTML = '';
+            fileInfo.textContent = `Processing: ${file.name}`;
+
+            if (!file.name.match(/\.(xlsx|xls|csv)$/)) {
+                showError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+                fileInfo.textContent = '';
+                return;
+            }
+
+            const analysisDate = extractDateFromFilename(file.name);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let workbook;
+                    // Check if the file is likely a CSV based on extension or detected type
+                    if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+                        // For CSV, decode ArrayBuffer to string and read as type 'string'
+                        const csvText = new TextDecoder('utf-8').decode(e.target.result); 
+                        workbook = XLSX.read(csvText, { type: 'string' });
+                    } else {
+                        // For Excel files (xlsx, xls), read as ArrayBuffer with type 'array'
+                        workbook = XLSX.read(e.target.result, { type: 'array' });
+                    }
+                    
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    console.log("Parsed JSON Data:", jsonData); // Debugging: Check what data is being read
+                    processData(jsonData, analysisDate);
+                } catch (err) {
+                    showError('Error processing the file. Please ensure it is a valid, uncorrupted Excel/CSV file.');
+                    console.error("Detailed file processing error:", err); // Log the actual error object
+                } finally {
+                    fileInfo.textContent = '';
+                }
+            };
+            reader.readAsArrayBuffer(file); // Always read as ArrayBuffer first
+        }
+
+        function processData(data, analysisDate) {
+            console.log("Data received by processData:", data); // Debugging point 1
+            const requiredColumns = ['Employee', 'App/Site Name', 'Status', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.');
+                return;
+            }
+            
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`);
+                return;
+            }
+
+            const employeeAppUsage = {};
+
+            data.forEach(row => {
+                console.log("Processing row:", row); // Debugging point 2
+                const employee = row.Employee;
+                const appSiteName = row['App/Site Name'];
+                const activityDurationStr = row['Activity Duration']; // This is "00h 00m" type string
+                const durationHours = parseDurationString(activityDurationStr);
+
+                console.log(`Employee: ${employee}, App: ${appSiteName}, Duration String: '${activityDurationStr}', Parsed Duration Hours: ${durationHours}`); // Debugging point 3
+
+                if (durationHours === 0 && activityDurationStr !== '00h 00m 00s' && activityDurationStr !== '00h 00m') {
+                    console.warn(`Skipping row for ${employee} - App: ${appSiteName} due to unparsable or zero duration: '${activityDurationStr}'`);
+                    return; // Skip if duration is 0 and not explicitly "00h 00m"
+                }
+
+                if (!employeeAppUsage[employee]) {
+                    employeeAppUsage[employee] = {
+                        apps: {},
+                        totalHours: 0
+                    };
+                }
+
+                if (!employeeAppUsage[employee].apps[appSiteName]) {
+                    employeeAppUsage[employee].apps[appSiteName] = 0;
+                }
+                employeeAppUsage[employee].apps[appSiteName] += durationHours;
+                employeeAppUsage[employee].totalHours += durationHours;
+            });
+            
+            displayResults(employeeAppUsage, analysisDate);
+        }
+
+        function displayResults(employeeAppUsage, analysisDate) {
+            if (Object.keys(employeeAppUsage).length === 0) {
+                showError('No valid app usage data found to display.');
+                return;
+            }
+
+            Object.keys(employeeAppUsage).sort().forEach(employeeName => {
+                const employeeData = employeeAppUsage[employeeName];
+                const card = resultCardTemplate.content.cloneNode(true).firstElementChild;
+                
+                card.querySelector('.employee-name').textContent = employeeName;
+                card.querySelector('.report-date').textContent = analysisDate;
+
+                // Filter out apps with 0 hours to avoid clutter in charts/percentages
+                const filteredApps = Object.entries(employeeData.apps).filter(([app, hours]) => hours > 0);
+                const appLabels = filteredApps.map(([app, hours]) => app);
+                // Convert to numbers directly for Chart.js
+                const appHours = filteredApps.map(([app, hours]) => hours); 
+                
+                // Calculate percentages as numbers directly for Chart.js data
+                const appPercentages = appHours.map(hours => {
+                    return employeeData.totalHours > 0 ? (hours / employeeData.totalHours * 100) : 0; 
+                });
+                
+                // Populate percentage list (using toFixed for display)
+                const appPercentageList = card.querySelector('.app-percentage-list');
+                appPercentageList.innerHTML = ''; // Clear previous content
+                if (appLabels.length === 0) {
+                    appPercentageList.innerHTML = `<li class="py-2 px-3 text-center text-stone-500">No app usage data for this period.</li>`;
+                } else {
+                    appLabels.forEach((app, index) => {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'flex justify-between items-center py-2 px-3 hover:bg-stone-50 rounded-md';
+                        listItem.innerHTML = `<span>${app}</span> <span class="font-semibold text-stone-700">${appPercentages[index].toFixed(2)}%</span>`; // Display with toFixed
+                        appPercentageList.appendChild(listItem);
+                    });
+                }
+
+                resultsGrid.appendChild(card); // Append the card to the DOM first
+
+                // Introduce a larger delay before creating charts to ensure canvas is ready
+                setTimeout(() => {
+                    // Create Pie Chart
+                    createPieChart(card.querySelector('.pie-chart'), appLabels, appPercentages);
+                    // Create Bar Chart
+                    createBarChart(card.querySelector('.bar-chart'), appLabels, appHours);
+                }, 200); // Increased delay to 200ms
+
+
+                // Delay PDF generation slightly after charts, as PDF relies on rendered charts
+                setTimeout(() => {
+                    generateAndDownloadPdf(card, employeeName, analysisDate);
+                }, 400); // Increased delay to 400ms for PDF
+            });
+        }
+
+        function generateRandomColors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                // Generate distinct, pastel-like colors
+                const hue = (i * 137) % 360; // Use golden ratio conjugate for good distribution
+                colors.push(`hsl(${hue}, 70%, 75%)`); 
+            }
+            return colors;
+        }
+
+        function createPieChart(canvas, labels, percentages) {
+            // Only create chart if there is data
+            if (labels.length === 0 || percentages.length === 0 || percentages.every(p => p === 0)) {
+                console.warn("Skipping pie chart creation due to no valid data.");
+                return;
+            }
+
+            const backgroundColors = generateRandomColors(labels.length);
+            new Chart(canvas, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: percentages, // Ensure this is numbers
+                        backgroundColor: backgroundColors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    if (data.labels.length && data.datasets.length) {
+                                        return data.labels.map(function(label, i) {
+                                            const value = parseFloat(data.datasets[0].data[i]); // Still parse to float for legend display
+                                            return {
+                                                text: `${label} (${value.toFixed(2)}%)`, // Show percentage in legend
+                                                fillStyle: backgroundColors[i], // Directly use our generated colors
+                                                strokeStyle: '#ffffff',
+                                                lineWidth: 2,
+                                                hidden: isNaN(value) || chart.getDatasetMeta(0).data[i].hidden,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                    return [];
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed.toFixed(2) + '%'; // Display with toFixed
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createBarChart(canvas, labels, hours) {
+            // Only create chart if there is data
+            if (labels.length === 0 || hours.length === 0 || hours.every(h => h === 0)) {
+                console.warn("Skipping bar chart creation due to no valid data.");
+                return;
+            }
+
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours Used',
+                        data: hours, // Ensure this is numbers
+                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Make it horizontal bar chart
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { // X-axis for hours
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Hours'
+                            }
+                        },
+                        y: { // Y-axis for labels
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    // Word wrap labels if they are too long
+                                    if (label.length > 20) { // Adjust threshold as needed
+                                        const words = label.split(' ');
+                                        let line = '';
+                                        let lines = [];
+                                        for (const word of words) {
+                                            if ((line + word).length > 20) {
+                                                lines.push(line.trim());
+                                                line = word + ' ';
+                                            } else {
+                                                line += word + ' ';
+                                            }
+                                        }
+                                        lines.push(line.trim());
+                                        return lines;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // Hide legend as there's only one dataset
+                        }
+                    }
+                }
+            });
+        }
+
+        async function generateAndDownloadPdf(element, employeeName, analysisDate) {
+            try {
+                const canvas = await html2canvas(element, { 
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    allowTaint: true // Allows cross-origin images for some setups, though not ideal
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                
+                const safeEmployeeName = employeeName.replace(/ /g, '_');
+                const fileName = `app_usage_summary_${safeEmployeeName}_${analysisDate}.pdf`;
+                pdf.save(fileName);
+
+            } catch(error) {
+                console.error('Failed to generate PDF for', employeeName, ':', error);
+                // Optionally show a message to the user if PDF generation fails for a specific card
+            }
+        }
+    </script>
+</body>
+</html>

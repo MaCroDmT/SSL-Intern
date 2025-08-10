@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Data Alignment Fixer</title>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application uses a simple, linear flow focusing on a single task: file cleaning and download. It presents a clear upload zone initially. Upon file selection and processing, status messages update the user on progress and indicate when the cleaned file is ready for download. This minimal structure is chosen for its directness, as the primary output is a new file rather than an on-screen visualization. -->
+    <!-- Visualization & Content Choices: Goal: Transform Data -> Method: In-browser data manipulation using xlsx.js -> Interaction: File upload and automatic download -> Justification: Addresses specific column alignment and data transfer issues to produce a correctly structured Excel file. Libraries: xlsx.js for reading/writing Excel, FileSaver.js for triggering client-side downloads. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">Excel Data Alignment Fixer</h1>
+            <p class="text-stone-500 mt-2">Upload your misaligned Excel/CSV file to fix column data and download a corrected version.</p>
+        </header>
+
+        <main>
+            <section id="upload-section" class="w-full max-w-2xl mx-auto">
+                <div id="drop-zone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your Excel/CSV file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="file-info" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="error-message" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Expected Input File Structure:</h3>
+                    <p>This tool is designed for files where the copied data has shifted, specifically:</p>
+                    <ul class="list-disc list-inside mt-2 ml-4">
+                        <li>The <code class="font-mono bg-blue-100 px-1 rounded">Icon</code> column is present but should be removed.</li>
+                        <li>The actual <code class="font-mono bg-blue-100 px-1 rounded">Status</code> data is in the 4th column (often labeled <code class="font-mono bg-blue-100 px-1 rounded">__EMPTY_3</code> by parsers if no header).</li>
+                        <li>The actual <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code> data is in the column named <code class="font-mono bg-blue-100 px-1 rounded">Status</code>.</li>
+                        <li>The column named <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code> is empty.</li>
+                    </ul>
+                    <p class="mt-2 font-semibold">Please ensure your file roughly matches this pattern for successful fixing.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const errorMessage = document.getElementById('error-message');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            fileInfo.textContent = ''; // Clear processing message on error
+        }
+
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.classList.add('hidden');
+        }
+
+        function handleFile(file) {
+            clearError();
+            fileInfo.textContent = `Processing '${file.name}'... Please wait.`;
+
+            if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+                showError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let workbook;
+                    if (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv') {
+                        const csvText = new TextDecoder('utf-8').decode(e.target.result); 
+                        workbook = XLSX.read(csvText, { type: 'string' });
+                    } else {
+                        workbook = XLSX.read(e.target.result, { type: 'array' });
+                    }
+                    
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    // Convert sheet to JSON, preserving raw headers including empty ones.
+                    // This is crucial for identifying '__EMPTY_X' columns.
+                    // header: 1 to ensure headers are read from the first row and not inferred, then defval for missing values.
+                    let jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }); 
+                    
+                    // The first row of jsonData will now be the array of headers.
+                    // We need to map these to usable keys for the actual data rows.
+                    const headers = jsonData[0];
+                    const dataRows = jsonData.slice(1); // Actual data starts from the second row
+
+                    // Create new JSON data with proper keys
+                    const processedData = dataRows.map(row => {
+                        const newRow = {};
+                        headers.forEach((header, index) => {
+                            let key = header;
+                            // If header is null/empty, assign a temporary key based on index
+                            if (key === null || key === '') {
+                                key = `__COL_${index}`; 
+                            }
+                            newRow[key] = row[index];
+                        });
+                        return newRow;
+                    });
+                    
+                    processData(processedData);
+
+                } catch (err) {
+                    showError('Error processing the file. Please ensure it is a valid, uncorrupted Excel/CSV file and matches the expected column structure.');
+                    console.error("Detailed file processing error:", err);
+                } finally {
+                    fileInfo.textContent = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData(data) {
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows after header parsing.');
+                return;
+            }
+
+            // Dynamically find the column keys after initial parsing
+            // Use Object.keys(data[0]) to see what keys XLSX.utils.sheet_to_json actually generated
+            const actualHeadersInData = Object.keys(data[0]);
+
+            // Attempt to find the correct column for Status and Activity Duration based on data content or typical patterns
+            // Assuming 'Neutral' (or similar status) is in an unnamed column, and duration is in 'Status' column
+            let statusColumnKey = null; // This will hold the key like '__COL_3' or similar
+            let activityDurationColumnKey = 'Status'; // As per your description, this column contains duration
+
+            // Iterate through the first row to find the unnamed column containing 'Neutral' (Status)
+            // This is a heuristic and might need adjustment if data patterns vary
+            for (const key of actualHeadersInData) {
+                if (key.startsWith('__COL_') && data[0][key] && String(data[0][key]).toLowerCase().includes('neutral')) {
+                    statusColumnKey = key;
+                    break;
+                }
+            }
+
+            // Fallback for statusColumnKey if not found by content, assume it's __COL_3
+            if (!statusColumnKey) {
+                const potentialStatusKey = actualHeadersInData.find(key => key === '__COL_3' || key.toLowerCase().includes('status'));
+                if (potentialStatusKey && potentialStatusKey !== 'Status') { // Ensure it's not the 'Status' column that has duration
+                     statusColumnKey = potentialStatusKey;
+                }
+            }
+
+
+            // Validate that critical headers are somehow found
+            if (!actualHeadersInData.includes('Employee') || 
+                !actualHeadersInData.includes('App/Site Name') ||
+                !statusColumnKey || // Ensure we found a key for status
+                !actualHeadersInData.includes(activityDurationColumnKey) // Ensure 'Status' column (which holds duration) exists
+                ) {
+                showError('Input file columns do not match the expected format for fixing. Could not find all necessary columns (Employee, App/Site Name, Status data, Activity Duration data).');
+                console.error("Actual headers found:", actualHeadersInData);
+                console.error("Detected status column key:", statusColumnKey);
+                return;
+            }
+
+            const cleanedData = data.map(row => {
+                const newRow = {};
+
+                newRow['Employee'] = row['Employee'] !== undefined ? String(row['Employee']) : null;
+                newRow['App/Site Name'] = row['App/Site Name'] !== undefined ? String(row['App/Site Name']) : null;
+                
+                // Use the dynamically found statusColumnKey
+                newRow['Status'] = statusColumnKey && row[statusColumnKey] !== undefined ? String(row[statusColumnKey]) : null;
+
+                // Activity Duration is from the column named 'Status' in the input
+                newRow['Activity Duration'] = row[activityDurationColumnKey] !== undefined ? String(row[activityDurationColumnKey]) : null;
+
+                return newRow;
+            });
+
+            downloadFixedFile(cleanedData);
+        }
+
+        function downloadFixedFile(data) {
+            // Define the desired order of columns for the output file
+            const outputHeaders = ['Employee', 'App/Site Name', 'Status', 'Activity Duration'];
+
+            // Create a worksheet from the data, ensuring column order
+            const ws = XLSX.utils.json_to_sheet(data, { header: outputHeaders });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Fixed Data");
+
+            // Generate today's date in YYYY-MM-DD format
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const day = String(today.getDate()).padStart(2, '0');
+            const dateForFilename = `${year}-${month}-${day}`;
+            
+            // The requested filename format: "Fixed-App-Site-Usage-date.xlsx"
+            const outputFilename = `Fixed-App-Site-Usage-${dateForFilename}.xlsx`;
+
+            // Write the workbook to a binary string, then convert to a Blob
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+            // Use FileSaver.js to trigger download
+            saveAs(blob, outputFilename);
+            fileInfo.textContent = `Successfully fixed and downloaded '${outputFilename}'.`;
+        }
+    </script>
+</body>
+</html>

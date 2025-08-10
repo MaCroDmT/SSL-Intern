@@ -1,0 +1,10 @@
+<footer class="mt-12 p-6 bg-stone-100 text-stone-600 text-center rounded-t-lg">
+    <div class="mb-4">
+        <p class="font-semibold text-lg text-stone-700">Workfolio Automation developed by:</p>
+        <p class="text-stone-700">Sonia and Sweaters Ltd. Software Team</p>
+    </div>
+    <div class="text-sm">
+        <p><a href="mailto:wasif@soniagroup.com" class="text-indigo-600 hover:underline">wasif@soniagroup.com</a></p>
+        <p><a href="mailto:prottoy.saha@soniagroup.com" class="text-indigo-600 hover:underline">prottoy.saha@soniagroup.com</a></p>
+    </div>
+</footer>

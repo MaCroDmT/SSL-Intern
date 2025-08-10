@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Activity Log Analyzer</title>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application uses a task-oriented, single-page design. Initially, it presents a clear call-to-action: an upload area. Upon successful file processing, this area is replaced by a dynamic grid of results. Each result card, representing an employee's daily summary, contains both a statistical table and a visual chart. This structure was chosen for its simplicity and clear user flow, guiding the user from a single input action to a comprehensive, multi-faceted output without navigation or page reloads, making the analysis process highly efficient. -->
+    <!-- Visualization & Content Choices: The SRS requires detailed counts and time comparisons. Goal: Inform (Precise Counts) -> Method: HTML Table -> Interaction: Static Display -> Justification: Tables provide exact, easy-to-read numerical data as required. Goal: Compare (Time Durations) -> Method: Horizontal Bar Chart -> Interaction: Visual Comparison -> Justification: Bar charts excel at comparing distinct categories (Total vs. Work vs. Idle time), making performance insights immediately apparent. Goal: Distribute/Report -> Method: PDF Generation -> Interaction: Automatic Download -> Justification: PDFs create a portable, standardized, and printable artifact of the analysis for each employee, fulfilling a key requirement. Libraries: xlsx.js for Excel parsing, Chart.js for canvas-based charts, and jsPDF with html2canvas for client-side PDF generation. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 300px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">Work Activity Log Analyzer</h1>
+            <p class="text-stone-500 mt-2">Upload your Excel log file to automatically generate and download daily summaries.</p>
+        </header>
+
+        <main>
+            <section id="upload-section" class="w-full max-w-2xl mx-auto">
+                <div id="drop-zone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="file-info" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="error-message" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Required Excel/CSV Format:</h3>
+                    <p>Please ensure your file has the following columns: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">Date</code>, <code class="font-mono bg-blue-100 px-1 rounded">Start Time</code>, <code class="font-mono bg-blue-100 px-1 rounded">End Time</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                </div>
+            </section>
+
+            <section id="results-section" class="mt-12">
+                <div id="results-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <template id="result-card-template">
+        <div class="result-card bg-white p-6 rounded-xl shadow-md border border-stone-200">
+            <h2 class="text-xl font-bold text-stone-800 mb-1 employee-name"></h2>
+            <p class="text-sm text-stone-500 mb-4 report-date"></p>
+            
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">Activity Summary</h3>
+                <table class="w-full text-sm text-left">
+                    <tbody class="divide-y divide-stone-200">
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Worked for in a day</td>
+                            <td class="py-2 pl-2 font-medium text-right worked-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">System locked/clocked out</td>
+                            <td class="py-2 pl-2 font-medium text-right system-locked-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Took a break</td>
+                            <td class="py-2 pl-2 font-medium text-right took-break-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">System Suspended</td>
+                            <td class="py-2 pl-2 font-medium text-right system-suspended-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Internet Interrupted</td>
+                            <td class="py-2 pl-2 font-medium text-right internet-interrupted-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Average Idle Time</td>
+                            <td class="py-2 pl-2 font-medium text-right avg-idle-time"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">Total vs Working vs Idle Time per Day</h3>
+                <div class="chart-container">
+                    <canvas></canvas>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const errorMessage = document.getElementById('error-message');
+        const resultsGrid = document.getElementById('results-grid');
+        const resultCardTemplate = document.getElementById('result-card-template');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-600', 'bg-indigo-50');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.classList.add('hidden');
+        }
+
+        function handleFile(file) {
+            clearError();
+            resultsGrid.innerHTML = '';
+            fileInfo.textContent = `Processing: ${file.name}`;
+
+            // Allow both .xlsx, .xls, and .csv
+            if (!file.name.match(/\.(xlsx|xls|csv)$/)) {
+                showError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+                fileInfo.textContent = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    processData(jsonData);
+                } catch (err) {
+                    showError('Error processing the file. Please ensure it is a valid, uncorrupted Excel/CSV file.');
+                    console.error(err);
+                } finally {
+                    fileInfo.textContent = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // New function to parse duration from strings like "01h 54m 02s" or "00h 00m"
+        function parseDurationFromActivityString(activityString) {
+            if (typeof activityString !== 'string' || activityString.trim() === '') {
+                return null;
+            }
+            // Regex to match "Xh Ym Zs" or "Xh Ym" patterns. Note: \s* for optional spaces
+            const match = activityString.match(/(\d+)\s*h\s*(\d+)\s*m(?:\s*(\d+)\s*s)?/i);
+            if (match) {
+                const hours = parseInt(match[1] || 0);
+                const minutes = parseInt(match[2] || 0);
+                const seconds = parseInt(match[3] || 0); // Seconds part is optional
+                return hours + (minutes / 60) + (seconds / 3600);
+            }
+            return null; // No duration found in string
+        }
+
+        function processData(data) {
+            const requiredColumns = ['Employee', 'Date', 'Start Time', 'End Time', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.');
+                return;
+            }
+            
+            // Check for column existence, accounting for potential variations in case/spaces
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`);
+                return;
+            }
+
+            const employeeData = {};
+
+            data.forEach(row => {
+                const employee = row.Employee;
+                
+                // Ensure date parsing is robust for various formats
+                let dateObj = row.Date instanceof Date ? row.Date : new Date(row.Date);
+                if (isNaN(dateObj)) {
+                    // Try parsing if it's a number (Excel date serial)
+                    if (typeof row.Date === 'number') {
+                        dateObj = new Date(Math.round((row.Date - 25569) * 86400 * 1000)); // Convert Excel serial date to JS Date
+                    } else {
+                        console.warn(`Could not parse date for employee ${employee}: ${row.Date}`);
+                        return; // Skip this row if date is invalid
+                    }
+                }
+                const date = dateObj.toISOString().split('T')[0];
+                const key = `${employee}_${date}`;
+
+                if (!employeeData[key]) {
+                    employeeData[key] = {
+                        employee,
+                        date,
+                        activities: [],
+                        workedCount: 0,
+                        systemLockedCount: 0,
+                        tookBreakCount: 0,
+                        systemSuspendedCount: 0,
+                        internetInterruptedCount: 0,
+                        totalWorkingTime: 0,
+                        workDuration: 0,
+                        idleTime: 0,
+                    };
+                }
+
+                // Robust time parsing function for Start Time / End Time
+                const parseTime = (timeStr) => {
+                    if (typeof timeStr !== 'string' || timeStr.trim() === '' || timeStr.trim() === '-') {
+                        return null; // Invalid or empty time string
+                    }
+
+                    // Try parsing "HH:MM AM/PM"
+                    let match = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+                    if (match) {
+                        let hours = parseInt(match[1]);
+                        const minutes = parseInt(match[2]);
+                        const period = match[3];
+
+                        if (period && period.toLowerCase() === 'pm' && hours < 12) hours += 12;
+                        if (period && period.toLowerCase() === 'am' && hours === 12) hours = 0; // 12 AM (midnight)
+                        return { hours, minutes };
+                    }
+
+                    // Try parsing "HH:MM:SS" or "HH:MM" (24-hour format)
+                    match = timeStr.match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+                    if (match) {
+                        const hours = parseInt(match[1]);
+                        const minutes = parseInt(match[2]);
+                        return { hours, minutes };
+                    }
+
+                    return null; // Could not parse with either pattern
+                };
+
+                const startParsed = parseTime(row['Start Time']);
+                const endParsed = parseTime(row['End Time']);
+                
+                if (!startParsed || !endParsed) {
+                    console.warn(`Could not parse time for employee ${employee} on ${date}: Start Time '${row['Start Time']}', End Time '${row['End Time']}'. Skipping row.`);
+                    return; // Skip this row if time parsing fails
+                }
+
+
+                // Reconstruct Date objects with parsed time to calculate duration
+                let startTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), startParsed.hours, startParsed.minutes);
+                let endTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), endParsed.hours, endParsed.minutes);
+                
+                // Handle cases where end time is on the next day (e.g., 11 PM to 1 AM)
+                if (endTime < startTime) {
+                    endTime.setDate(endTime.getDate() + 1);
+                }
+
+                const durationHoursFromStartEnd = (endTime - startTime) / (1000 * 60 * 60);
+                
+                // Only add positive durations to total working time
+                if (durationHoursFromStartEnd > 0) {
+                    employeeData[key].totalWorkingTime += durationHoursFromStartEnd;
+                }
+                
+                const activityText = String(row['Activity Duration']).toLowerCase().trim(); 
+                let specificActivityDuration = parseDurationFromActivityString(activityText);
+
+                // Use includes for more flexible matching and assign durations
+                if (activityText.includes('worked for')) { 
+                    employeeData[key].workedCount++;
+                    // Prioritize specific duration from text, else use duration from start/end times
+                    employeeData[key].workDuration += (specificActivityDuration !== null ? specificActivityDuration : durationHoursFromStartEnd);
+                } else if (activityText.includes('system locked')) { 
+                    employeeData[key].systemLockedCount++;
+                } else if (activityText.includes('took a break')) { 
+                    employeeData[key].tookBreakCount++;
+                    // Prioritize specific duration from text, else use duration from start/end times
+                    employeeData[key].idleTime += (specificActivityDuration !== null ? specificActivityDuration : durationHoursFromStartEnd);
+                } else if (activityText.includes('system suspended')) { 
+                    employeeData[key].systemSuspendedCount++;
+                } else if (activityText.includes('internet interrupted')) { 
+                    employeeData[key].internetInterruptedCount++;
+                }
+            });
+            
+            displayResults(employeeData);
+        }
+
+        function displayResults(employeeData) {
+            if (Object.keys(employeeData).length === 0) {
+                showError('No valid data found to process and display.');
+                return;
+            }
+
+            // Sort results by employee name and then date
+            const sortedKeys = Object.keys(employeeData).sort((a, b) => {
+                const [empA, dateA] = a.split('_');
+                const [empB, dateB] = b.split('_');
+                if (empA !== empB) return empA.localeCompare(empB);
+                return dateA.localeCompare(dateB);
+            });
+
+            sortedKeys.forEach(key => {
+                const data = employeeData[key];
+                const card = resultCardTemplate.content.cloneNode(true).firstElementChild;
+                
+                const avgIdleTime = data.tookBreakCount > 0 ? (data.idleTime / data.tookBreakCount).toFixed(2) + ' hours' : 'N/A';
+
+                card.querySelector('.employee-name').textContent = data.employee;
+                card.querySelector('.report-date').textContent = data.date;
+                card.querySelector('.worked-count').textContent = data.workedCount;
+                card.querySelector('.system-locked-count').textContent = data.systemLockedCount;
+                card.querySelector('.took-break-count').textContent = data.tookBreakCount;
+                card.querySelector('.system-suspended-count').textContent = data.systemSuspendedCount;
+                card.querySelector('.internet-interrupted-count').textContent = data.internetInterruptedCount;
+                card.querySelector('.avg-idle-time').textContent = avgIdleTime;
+                
+                resultsGrid.appendChild(card);
+                
+                createChart(card.querySelector('canvas'), data);
+                // Introduce a small delay before generating PDF to ensure chart renders
+                setTimeout(() => {
+                    generateAndDownloadPdf(card, data.employee, data.date);
+                }, 100); 
+            });
+        }
+
+        function createChart(canvas, data) {
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: [`${data.employee} (${data.date})`],
+                    datasets: [
+                        {
+                            label: 'Total Working Time (h)',
+                            data: [data.totalWorkingTime.toFixed(2)],
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Work Duration (h)',
+                            data: [data.workDuration.toFixed(2)],
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Idle Time (h)',
+                            data: [data.idleTime.toFixed(2)],
+                            backgroundColor: 'rgba(249, 115, 22, 0.7)',
+                            borderColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Hours'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        async function generateAndDownloadPdf(element, employeeName, date) {
+            try {
+                const canvas = await html2canvas(element, { 
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                
+                const safeEmployeeName = employeeName.replace(/ /g, '_');
+                const fileName = `time_summary_${safeEmployeeName}_${date}.pdf`;
+                pdf.save(fileName);
+
+            } catch(error) {
+                console.error('Failed to generate PDF:', error);
+                // Optionally show a message to the user if PDF generation fails for a specific card
+            }
+        }
+    </script>
+</body>
+</html>
