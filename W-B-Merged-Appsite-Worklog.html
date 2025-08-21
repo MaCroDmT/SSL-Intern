@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSL Workfolio Automation Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* Max width for chart to avoid stretching */
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px; /* Base height for chart */
+            max-height: 350px; /* Max height for chart */
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 300px; /* Adjust height for larger screens */
+            }
+        }
+        .pie-chart-container {
+            height: 250px; /* Specific height for pie chart to ensure readability */
+            max-height: 300px;
+        }
+        @media (min-width: 768px) {
+            .pie-chart-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 flex flex-col min-h-screen">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">Workfolio Automation Suite</h1>
+            <p class="text-stone-500 mt-2">Choose a tool to get started.</p>
+        </header>
+
+        <!-- Mode Selection Buttons -->
+        <div class="flex flex-wrap justify-center gap-4 mb-8">
+            <button id="showAppSiteFixerBtn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors text-sm sm:text-base">
+                App/Site Excel Fixer
+            </button>
+            <button id="showAppSiteAnalyzerBtn" class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition-colors text-sm sm:text-base">
+                App/Site Usage Analyzer
+            </button>
+            <button id="showWorkLogFixerBtn" class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition-colors text-sm sm:text-base">
+                Work Log Excel Fixer
+            </button>
+            <button id="showWorkLogAnalyzerBtn" class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition-colors text-sm sm:text-base">
+                Work Log Analyzer
+            </button>
+        </div>
+
+        <main>
+            <!-- App/Site Excel File Fixer Section -->
+            <section id="appSiteFixerSection" class="w-full max-w-2xl mx-auto hidden">
+                <h2 class="text-2xl font-bold text-stone-700 mb-6 text-center">App/Site Excel File Fixer</h2>
+                <div id="appSiteFixerDropZone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="appSiteFixerFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your misaligned App/Site Excel/CSV file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="appSiteFixerFileInfo" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="appSiteFixerErrorMessage" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Expected Input File Structure for App/Site Excel Fixer:</h3>
+                    <p>This tool is designed for files where the copied data has shifted, specifically:</p>
+                    <ul class="list-disc list-inside mt-2 ml-4">
+                        <li>The <code class="font-mono bg-blue-100 px-1 rounded">Icon</code> column is present but should be removed.</li>
+                        <li>The actual <code class="font-mono bg-blue-100 px-1 rounded">Status</code> data is in the 4th column (often labeled <code class="font-mono bg-blue-100 px-1 rounded">__COL_3</code> by parsers if no explicit header).</li>
+                        <li>The actual <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code> data is in the column currently named <code class="font-mono bg-blue-100 px-1 rounded">Status</code>.</li>
+                        <li>The column currently named <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code> is empty.</li>
+                    </ul>
+                    <p class="mt-2 font-semibold">Please ensure your file roughly matches this pattern for successful fixing.</p>
+                </div>
+            </section>
+
+            <!-- App/Site Usage Analyzer Section -->
+            <section id="appSiteAnalyzerSection" class="hidden">
+                <h2 class="text-2xl font-bold text-stone-700 mb-6 text-center">App/Site Usage Analyzer</h2>
+                <div id="appSiteAnalyzerDropZone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors w-full max-w-2xl mx-auto">
+                    <input type="file" id="appSiteAnalyzerFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your App/Site Usage file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="appSiteAnalyzerFileInfo" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="appSiteAnalyzerErrorMessage" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 w-full max-w-2xl mx-auto">
+                    <h3 class="font-bold mb-2">Required App/Site Usage File Format:</h3>
+                    <p>Your file must contain the following columns: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">App/Site Name</code>, <code class="font-mono bg-blue-100 px-1 rounded">Status</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                    <p class="mt-2">The analysis date will be inferred from the filename (e.g., "09-Aug" from "workfolio-apps-usage-09-Aug.xlsx") or default to today's date if not found.</p>
+                    <p class="mt-2 font-semibold text-red-700">Note: PDFs will be downloaded to your browser's default download location. Client-side web applications cannot save directly to specific local paths like 'D:\...'.</p>
+                </div>
+
+                <div id="results-section-appSiteAnalyzer" class="mt-12">
+                    <div id="results-grid-appSiteAnalyzer" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Work Log Excel File Fixer Section -->
+            <section id="workLogFixerSection" class="w-full max-w-2xl mx-auto hidden">
+                <h2 class="text-2xl font-bold text-stone-700 mb-6 text-center">Work Log Excel File Fixer</h2>
+                <div id="workLogFixerDropZone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors">
+                    <input type="file" id="workLogFixerFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your Work Log Excel/CSV file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="workLogFixerFileInfo" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="workLogFixerErrorMessage" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <h3 class="font-bold mb-2">Expected Input File Columns for Work Log Fixer:</h3>
+                    <p>Your file should contain: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">Date</code>, <code class="font-mono bg-blue-100 px-1 rounded">Start Time</code>, <code class="font-mono bg-blue-100 px-1 rounded">End Time</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                    <p class="mt-2">This tool will fix common formatting issues (date, time, activity duration string) and download a new Excel file.</p>
+                </div>
+            </section>
+
+            <!-- Work Log Analyzer Section -->
+            <section id="workLogAnalyzerSection" class="hidden">
+                <h2 class="text-2xl font-bold text-stone-700 mb-6 text-center">Work Log Analyzer</h2>
+                <div id="workLogAnalyzerDropZone" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center cursor-pointer bg-white hover:bg-stone-100 transition-colors w-full max-w-2xl mx-auto">
+                    <input type="file" id="workLogAnalyzerFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-12 h-12 text-stone-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3-3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.342 0 4.5 4.5 0 01-1.41 8.775H6.75z" />
+                        </svg>
+                        <p class="font-semibold text-stone-600">Drag & drop your Work Log file here</p>
+                        <p class="text-sm text-stone-500 mt-1">or <span class="text-indigo-600 font-medium">click to browse</span></p>
+                    </div>
+                </div>
+                <div id="workLogAnalyzerFileInfo" class="mt-4 text-center text-sm text-stone-600"></div>
+                <div id="workLogAnalyzerErrorMessage" class="mt-4 text-center text-sm text-red-600 bg-red-100 p-3 rounded-lg hidden"></div>
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 w-full max-w-2xl mx-auto">
+                    <h3 class="font-bold mb-2">Required Work Log File Format:</h3>
+                    <p>Your file must contain the following columns: <code class="font-mono bg-blue-100 px-1 rounded">Employee</code>, <code class="font-mono bg-blue-100 px-1 rounded">Date</code>, <code class="font-mono bg-blue-100 px-1 rounded">Start Time</code>, <code class="font-mono bg-blue-100 px-1 rounded">End Time</code>, and <code class="font-mono bg-blue-100 px-1 rounded">Activity Duration</code>.</p>
+                    <p class="mt-2 font-semibold text-red-700">Note: PDFs will be downloaded to your browser's default download location. Client-side web applications cannot save directly to specific local paths like 'D:\...'.</p>
+                </div>
+                <div id="results-section-workLogAnalyzer" class="mt-12">
+                    <div id="results-grid-workLogAnalyzer" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Template for App/Site Analyzer results card -->
+    <template id="result-card-template-appSiteAnalyzer">
+        <div class="result-card bg-white p-6 rounded-xl shadow-md border border-stone-200">
+            <h2 class="text-xl font-bold text-stone-800 mb-1 employee-name"></h2>
+            <p class="text-sm text-stone-500 mb-4 report-date"></p>
+            
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">App Usage Distribution (%)</h3>
+                <div class="pie-chart-container">
+                    <canvas class="pie-chart"></canvas>
+                </div>
+                <ul class="mt-4 text-sm app-percentage-list divide-y divide-stone-100 border-t border-b border-stone-100 rounded">
+                    <!-- App percentages will be inserted here -->
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">App Usage Hours</h3>
+                <div class="chart-container">
+                    <canvas class="bar-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for Work Log Analyzer results card -->
+    <template id="result-card-template-workLogAnalyzer">
+        <div class="result-card bg-white p-6 rounded-xl shadow-md border border-stone-200">
+            <h2 class="text-xl font-bold text-stone-800 mb-1 employee-name"></h2>
+            <p class="text-sm text-stone-500 mb-4 report-date"></p>
+            
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">Activity Summary</h3>
+                <table class="w-full text-sm text-left">
+                    <tbody class="divide-y divide-stone-200">
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Worked for in a day</td>
+                            <td class="py-2 pl-2 font-medium text-right worked-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">System locked/clocked out</td>
+                            <td class="py-2 pl-2 font-medium text-right system-locked-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Took a break</td>
+                            <td class="py-2 pl-2 font-medium text-right took-break-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">System Suspended</td>
+                            <td class="py-2 pl-2 font-medium text-right system-suspended-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Internet Interrupted</td>
+                            <td class="py-2 pl-2 font-medium text-right internet-interrupted-count"></td>
+                        </tr>
+                        <tr class="hover:bg-stone-50">
+                            <td class="py-2 pr-2">Average Idle Time</td>
+                            <td class="py-2 pl-2 font-medium text-right avg-idle-time"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-stone-700 mb-3">Total vs Working vs Idle Time per Day</h3>
+                <div class="chart-container">
+                    <canvas></canvas>
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <footer class="mt-12 p-6 bg-stone-100 text-stone-600 text-center rounded-t-lg">
+        <div class="mb-4">
+            <p class="font-semibold text-lg text-stone-700">Workfolio Automation developed by:</p>
+            <p class="text-stone-700">Sonia and Sweaters Ltd. Software Team</p>
+        </div>
+        <div class="text-sm">
+            <p><a href="mailto:wasif@soniagroup.com" class="text-indigo-600 hover:underline">wasif@soniagroup.com</a></p>
+            <p><a href="mailto:prottoy.saha@soniagroup.com" class="text-indigo-600 hover:underline">prottoy.saha@soniagroup.com</a></p>
+        </div>
+    </footer>
+
+    <script>
+        // --- Global Variables (Elements) ---
+        const showAppSiteFixerBtn = document.getElementById('showAppSiteFixerBtn');
+        const showAppSiteAnalyzerBtn = document.getElementById('showAppSiteAnalyzerBtn');
+        const showWorkLogFixerBtn = document.getElementById('showWorkLogFixerBtn');
+        const showWorkLogAnalyzerBtn = document.getElementById('showWorkLogAnalyzerBtn');
+
+        const appSiteFixerSection = document.getElementById('appSiteFixerSection');
+        const appSiteAnalyzerSection = document.getElementById('appSiteAnalyzerSection');
+        const workLogFixerSection = document.getElementById('workLogFixerSection');
+        const workLogAnalyzerSection = document.getElementById('workLogAnalyzerSection');
+
+        // App/Site Fixer elements
+        const appSiteFixerDropZone = document.getElementById('appSiteFixerDropZone');
+        const appSiteFixerFileInput = document.getElementById('appSiteFixerFileInput');
+        const appSiteFixerFileInfo = document.getElementById('appSiteFixerFileInfo');
+        const appSiteFixerErrorMessage = document.getElementById('appSiteFixerErrorMessage');
+
+        // App/Site Analyzer elements
+        const appSiteAnalyzerDropZone = document.getElementById('appSiteAnalyzerDropZone');
+        const appSiteAnalyzerFileInput = document.getElementById('appSiteAnalyzerFileInput');
+        const appSiteAnalyzerFileInfo = document.getElementById('appSiteAnalyzerFileInfo');
+        const appSiteAnalyzerErrorMessage = document.getElementById('appSiteAnalyzerErrorMessage');
+        const resultsGridAppSiteAnalyzer = document.getElementById('results-grid-appSiteAnalyzer');
+        const resultCardTemplateAppSiteAnalyzer = document.getElementById('result-card-template-appSiteAnalyzer');
+
+        // Work Log Fixer elements
+        const workLogFixerDropZone = document.getElementById('workLogFixerDropZone');
+        const workLogFixerFileInput = document.getElementById('workLogFixerFileInput');
+        const workLogFixerFileInfo = document.getElementById('workLogFixerFileInfo');
+        const workLogFixerErrorMessage = document.getElementById('workLogFixerErrorMessage');
+
+        // Work Log Analyzer elements
+        const workLogAnalyzerDropZone = document.getElementById('workLogAnalyzerDropZone');
+        const workLogAnalyzerFileInput = document.getElementById('workLogAnalyzerFileInput');
+        const workLogAnalyzerFileInfo = document.getElementById('workLogAnalyzerFileInfo');
+        const workLogAnalyzerErrorMessage = document.getElementById('workLogAnalyzerErrorMessage');
+        const resultsGridWorkLogAnalyzer = document.getElementById('results-grid-workLogAnalyzer');
+        const resultCardTemplateWorkLogAnalyzer = document.getElementById('result-card-template-workLogAnalyzer');
+        
+        const { jsPDF } = window.jspdf;
+
+        // --- Global Helper Functions ---
+        // Function to extract date from filename (used by Analyzer modes)
+        function extractDateFromFilename(filename) {
+            let dateMatch = filename.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/i);
+            if (dateMatch) {
+                let datePart = dateMatch[0];
+                if (datePart.includes('-') && !datePart.match(/^\d{4}/)) {
+                    const year = new Date().getFullYear();
+                    const [day, monthStr] = datePart.split('-');
+                    const monthMap = {
+                        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+                        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+                    };
+                    const monthNum = monthMap[monthStr.toLowerCase()];
+                    if (monthNum) {
+                        return `${year}-${monthNum}-${String(day).padStart(2, '0')}`;
+                    }
+                }
+                try {
+                    const d = new Date(datePart);
+                    if (!isNaN(d)) {
+                        return d.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn("Could not parse date from filename using Date object:", datePart);
+                }
+            }
+            return new Date().toISOString().split('T')[0];
+        }
+
+        let currentMode = 'appSiteFixer'; // Default mode
+
+        // --- Mode Switching Logic ---
+        function showSection(sectionId) {
+            const sections = [appSiteFixerSection, appSiteAnalyzerSection, workLogFixerSection, workLogAnalyzerSection];
+            sections.forEach(section => {
+                if (section.id === sectionId) {
+                    section.classList.remove('hidden');
+                } else {
+                    section.classList.add('hidden');
+                }
+            });
+            clearErrorsAndInfo();
+            resultsGridAppSiteAnalyzer.innerHTML = ''; // Clear analyzer results when switching
+            resultsGridWorkLogAnalyzer.innerHTML = ''; // Clear analyzer results when switching
+        }
+
+        function setActiveButton(buttonId) {
+            const buttons = [showAppSiteFixerBtn, showAppSiteAnalyzerBtn, showWorkLogFixerBtn, showWorkLogAnalyzerBtn];
+            buttons.forEach(btn => {
+                if (btn.id === buttonId) {
+                    btn.classList.remove('bg-gray-300', 'text-gray-800');
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('bg-gray-300', 'text-gray-800');
+                }
+            });
+        }
+
+        function showAppSiteFixerMode() {
+            showSection('appSiteFixerSection');
+            setActiveButton('showAppSiteFixerBtn');
+            currentMode = 'appSiteFixer';
+        }
+
+        function showAppSiteAnalyzerMode() {
+            showSection('appSiteAnalyzerSection');
+            setActiveButton('showAppSiteAnalyzerBtn');
+            currentMode = 'appSiteAnalyzer';
+        }
+
+        function showWorkLogFixerMode() {
+            showSection('workLogFixerSection');
+            setActiveButton('showWorkLogFixerBtn');
+            currentMode = 'workLogFixer';
+        }
+
+        function showWorkLogAnalyzerMode() {
+            showSection('workLogAnalyzerSection');
+            setActiveButton('showWorkLogAnalyzerBtn');
+            currentMode = 'workLogAnalyzer';
+        }
+
+        // --- Common Error/Info Functions ---
+        function showError(message, mode) {
+            if (mode === 'appSiteFixer') {
+                appSiteFixerErrorMessage.textContent = message;
+                appSiteFixerErrorMessage.classList.remove('hidden');
+                appSiteFixerFileInfo.textContent = '';
+            } else if (mode === 'appSiteAnalyzer') {
+                appSiteAnalyzerErrorMessage.textContent = message;
+                appSiteAnalyzerErrorMessage.classList.remove('hidden');
+                appSiteAnalyzerFileInfo.textContent = '';
+            } else if (mode === 'workLogFixer') {
+                workLogFixerErrorMessage.textContent = message;
+                workLogFixerErrorMessage.classList.remove('hidden');
+                workLogFixerFileInfo.textContent = '';
+            } else if (mode === 'workLogAnalyzer') {
+                workLogAnalyzerErrorMessage.textContent = message;
+                workLogAnalyzerErrorMessage.classList.remove('hidden');
+                workLogAnalyzerFileInfo.textContent = '';
+            }
+        }
+
+        function clearErrorsAndInfo() {
+            appSiteFixerErrorMessage.textContent = '';
+            appSiteFixerErrorMessage.classList.add('hidden');
+            appSiteFixerFileInfo.textContent = '';
+
+            appSiteAnalyzerErrorMessage.textContent = '';
+            appSiteAnalyzerErrorMessage.classList.add('hidden');
+            appSiteAnalyzerFileInfo.textContent = '';
+
+            workLogFixerErrorMessage.textContent = '';
+            workLogFixerErrorMessage.classList.add('hidden');
+            workLogFixerFileInfo.textContent = '';
+
+            workLogAnalyzerErrorMessage.textContent = '';
+            workLogAnalyzerErrorMessage.classList.add('hidden');
+            workLogAnalyzerFileInfo.textContent = '';
+        }
+
+        function updateFileInfo(message, mode) {
+            if (mode === 'appSiteFixer') {
+                appSiteFixerFileInfo.textContent = message;
+            } else if (mode === 'appSiteAnalyzer') {
+                appSiteAnalyzerFileInfo.textContent = message;
+            } else if (mode === 'workLogFixer') {
+                workLogFixerFileInfo.textContent = message;
+            } else if (mode === 'workLogAnalyzer') {
+                workLogAnalyzerFileInfo.textContent = message;
+            }
+        }
+
+        // --- Unified File Handling (called by all modes' drop zones/file inputs) ---
+        function handleFile(file, mode) {
+            clearErrorsAndInfo();
+            updateFileInfo(`Processing '${file.name}'... Please wait.`, mode);
+
+            if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+                showError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.', mode);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let workbook;
+                    if (file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv') {
+                        const csvText = new TextDecoder('utf-8').decode(e.target.result); 
+                        workbook = XLSX.read(csvText, { type: 'string' });
+                    } else {
+                        workbook = XLSX.read(e.target.result, { type: 'array' });
+                    }
+                    
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+
+                    if (mode === 'appSiteFixer') {
+                        let jsonDataRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }); 
+                        const rawHeaders = jsonDataRaw[0];
+                        const rawDataRows = jsonDataRaw.slice(1); 
+
+                        const processedData = rawDataRows.map(row => {
+                            const newRow = {};
+                            rawHeaders.forEach((header, index) => {
+                                let key = header;
+                                if (key === null || key === '') {
+                                    key = `__COL_${index}`; 
+                                }
+                                newRow[key] = row[index];
+                            });
+                            return newRow;
+                        });
+                        processAppSiteFixerData(processedData);
+
+                    } else if (mode === 'appSiteAnalyzer') {
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        const analysisDate = extractDateFromFilename(file.name); // Now accessible
+                        processAppSiteAnalyzerData(jsonData, analysisDate);
+
+                    } else if (mode === 'workLogFixer') {
+                        let jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        processWorkLogFixerData(jsonData); 
+
+                    } else if (mode === 'workLogAnalyzer') {
+                        const workLogWorkbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                        const workLogSheetName = workLogWorkbook.SheetNames[0];
+                        const workLogWorksheet = workLogWorkbook.Sheets[workLogSheetName];
+                        const workLogJsonData = XLSX.utils.sheet_to_json(workLogWorksheet);
+                        processWorkLogAnalyzerData(workLogJsonData);
+                    }
+
+                } catch (err) {
+                    showError('Error processing the file. Please ensure it is a valid, uncorrupted Excel/CSV file and matches the expected column structure.', mode);
+                    console.error("Detailed file processing error:", err);
+                } finally {
+                    updateFileInfo('', mode); // Clear "Processing..." message
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- App/Site Excel File Fixer Functions ---
+        function processAppSiteFixerData(data) {
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows after header parsing.', 'appSiteFixer');
+                return;
+            }
+
+            const outputHeaders = ['Employee', 'App/Site Name', 'Status', 'Activity Duration'];
+            const actualKeysInData = Object.keys(data[0]);
+
+            const sourceEmployeeKey = 'Employee';
+            const sourceAppSiteNameKey = 'App/Site Name';
+            const sourceShiftedStatusKey = '__COL_3'; 
+            const sourceShiftedActivityDurationKey = 'Status'; 
+
+            if (!actualKeysInData.includes(sourceEmployeeKey) || 
+                !actualKeysInData.includes(sourceAppSiteNameKey) ||
+                !actualKeysInData.includes(sourceShiftedStatusKey) || 
+                !actualKeysInData.includes(sourceShiftedActivityDurationKey)) {
+                
+                showError('Input file columns do not match the expected format for fixing. Missing one or more critical source columns. Check console for details.', 'appSiteFixer');
+                console.error("Expected source keys for mapping (App/Site Fixer):", {
+                    'Employee': sourceEmployeeKey,
+                    'App/Site Name': sourceAppSiteNameKey,
+                    'Shifted Status (e.g., Neutral)': sourceShiftedStatusKey,
+                    'Shifted Activity Duration (from "Status" column)': sourceShiftedActivityDurationKey
+                });
+                console.error("Actual keys found in first data row (App/Site Fixer):", actualKeysInData);
+                return;
+            }
+
+            const cleanedData = data.map(row => {
+                const newRow = {};
+                newRow['Employee'] = row[sourceEmployeeKey] !== undefined ? String(row[sourceEmployeeKey]).trim() + ' ' : null;
+                newRow['App/Site Name'] = row[sourceAppSiteNameKey] !== undefined ? String(row[sourceAppSiteNameKey]) : null;
+                newRow['Status'] = row[sourceShiftedStatusKey] !== undefined ? String(row[sourceShiftedStatusKey]) : null;
+                newRow['Activity Duration'] = row[sourceShiftedActivityDurationKey] !== undefined ? String(row[sourceShiftedActivityDurationKey]) : null;
+                return newRow;
+            });
+
+            downloadAppSiteFixedFile(cleanedData, outputHeaders);
+        }
+
+        function downloadAppSiteFixedFile(data, outputHeaders) {
+            const ws = XLSX.utils.json_to_sheet(data, { header: outputHeaders });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Fixed Data");
+
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dateForFilename = `${year}-${month}-${day}`;
+            
+            const outputFilename = `Fixed-App-Site-Usage-${dateForFilename}.xlsx`;
+
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+            saveAs(blob, outputFilename);
+            updateFileInfo(`Successfully fixed and downloaded '${outputFilename}'.`, 'appSiteFixer');
+        }
+
+        // --- App/Site Usage Analyzer Functions ---
+        function parseAppSiteDurationString(durationStr) {
+            if (typeof durationStr !== 'string' || durationStr.trim() === '') {
+                return 0;
+            }
+            const match = durationStr.match(/(\d+)\s*h\s*(\d+)\s*m(?:\s*(\d+)\s*s)?/i);
+            if (match) {
+                const hours = parseInt(match[1] || 0);
+                const minutes = parseInt(match[2] || 0);
+                const seconds = parseInt(match[3] || 0);
+                return hours + (minutes / 60) + (seconds / 3600);
+            }
+            return 0;
+        }
+
+        function processAppSiteAnalyzerData(data, analysisDate) {
+            const requiredColumns = ['Employee', 'App/Site Name', 'Status', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.', 'appSiteAnalyzer');
+                return;
+            }
+            
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`, 'appSiteAnalyzer');
+                return;
+            }
+
+            const employeeAppUsage = {};
+
+            data.forEach(row => {
+                const employee = row.Employee;
+                const appSiteName = row['App/Site Name'];
+                const activityDurationStr = row['Activity Duration'];
+                const durationHours = parseAppSiteDurationString(activityDurationStr);
+
+                if (durationHours === 0 && activityDurationStr !== '00h 00m 00s' && activityDurationStr !== '00h 00m') {
+                    console.warn(`Skipping row for ${employee} - App: ${appSiteName} due to unparsable or zero duration: '${activityDurationStr}'`);
+                    return;
+                }
+
+                if (!employeeAppUsage[employee]) {
+                    employeeAppUsage[employee] = {
+                        apps: {},
+                        totalHours: 0
+                    };
+                }
+
+                if (!employeeAppUsage[employee].apps[appSiteName]) {
+                    employeeAppUsage[employee].apps[appSiteName] = 0;
+                }
+                employeeAppUsage[employee].apps[appSiteName] += durationHours;
+                employeeAppUsage[employee].totalHours += durationHours;
+            });
+            
+            displayAppSiteAnalyzerResults(employeeAppUsage, analysisDate);
+        }
+
+        function displayAppSiteAnalyzerResults(employeeAppUsage, analysisDate) {
+            resultsGridAppSiteAnalyzer.innerHTML = ''; // Clear previous results
+            if (Object.keys(employeeAppUsage).length === 0) {
+                showError('No valid app usage data found to display.', 'appSiteAnalyzer');
+                return;
+            }
+
+            Object.keys(employeeAppUsage).sort().forEach(employeeName => {
+                const employeeData = employeeAppUsage[employeeName];
+                const card = resultCardTemplateAppSiteAnalyzer.content.cloneNode(true).firstElementChild;
+                
+                card.querySelector('.employee-name').textContent = employeeName;
+                card.querySelector('.report-date').textContent = analysisDate;
+
+                const filteredApps = Object.entries(employeeData.apps).filter(([app, hours]) => hours > 0);
+                const appLabels = filteredApps.map(([app, hours]) => app);
+                const appHours = filteredApps.map(([app, hours]) => hours); 
+                
+                const appPercentages = appHours.map(hours => {
+                    return employeeData.totalHours > 0 ? (hours / employeeData.totalHours * 100) : 0; 
+                });
+                
+                const appPercentageList = card.querySelector('.app-percentage-list');
+                appPercentageList.innerHTML = '';
+                if (appLabels.length === 0) {
+                    appPercentageList.innerHTML = `<li class="py-2 px-3 text-center text-stone-500">No app usage data for this period.</li>`;
+                } else {
+                    appLabels.forEach((app, index) => {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'flex justify-between items-center py-2 px-3 hover:bg-stone-50 rounded-md';
+                        listItem.innerHTML = `<span>${app}</span> <span class="font-semibold text-stone-700">${appPercentages[index].toFixed(2)}%</span>`;
+                        appPercentageList.appendChild(listItem);
+                    });
+                }
+
+                resultsGridAppSiteAnalyzer.appendChild(card);
+
+                setTimeout(() => {
+                    createAppSitePieChart(card.querySelector('.pie-chart'), appLabels, appPercentages);
+                    createAppSiteBarChart(card.querySelector('.bar-chart'), appLabels, appHours);
+                }, 200);
+
+                setTimeout(() => {
+                    generateAndDownloadAppSitePdf(card, employeeName, analysisDate);
+                }, 400);
+            });
+        }
+
+        function generateRandomColors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                const hue = (i * 137) % 360;
+                colors.push(`hsl(${hue}, 70%, 75%)`); 
+            }
+            return colors;
+        }
+
+        function createAppSitePieChart(canvas, labels, percentages) {
+            if (labels.length === 0 || percentages.length === 0 || percentages.every(p => p === 0)) {
+                console.warn("Skipping App/Site pie chart creation due to no valid data.");
+                return;
+            }
+
+            const backgroundColors = generateRandomColors(labels.length);
+            new Chart(canvas, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: percentages,
+                        backgroundColor: backgroundColors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    if (data.labels.length && data.datasets.length) {
+                                        return data.labels.map(function(label, i) {
+                                            const value = parseFloat(data.datasets[0].data[i]);
+                                            return {
+                                                text: `${label} (${value.toFixed(2)}%)`,
+                                                fillStyle: backgroundColors[i],
+                                                strokeStyle: '#ffffff',
+                                                lineWidth: 2,
+                                                hidden: isNaN(value) || chart.getDatasetMeta(0).data[i].hidden,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                    return [];
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed.toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createAppSiteBarChart(canvas, labels, hours) {
+            if (labels.length === 0 || hours.length === 0 || hours.every(h => h === 0)) {
+                console.warn("Skipping App/Site bar chart creation due to no valid data.");
+                return;
+            }
+
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours Used',
+                        data: hours,
+                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Hours'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    if (label.length > 20) {
+                                        const words = label.split(' ');
+                                        let line = '';
+                                        let lines = [];
+                                        for (const word of words) {
+                                            if ((line + word).length > 20) {
+                                                lines.push(line.trim());
+                                                line = word + ' ';
+                                            } else {
+                                                line += word + ' ';
+                                            }
+                                        }
+                                        lines.push(line.trim());
+                                        return lines;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        async function generateAndDownloadAppSitePdf(element, employeeName, analysisDate) {
+            try {
+                const canvas = await html2canvas(element, { 
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    allowTaint: true
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                
+                const safeEmployeeName = employeeName.replace(/ /g, '_');
+                const fileName = `app_usage_summary_${safeEmployeeName}_${analysisDate}.pdf`;
+                pdf.save(fileName);
+
+            } catch(error) {
+                console.error('Failed to generate App/Site PDF for', employeeName, ':', error);
+            }
+        }
+
+
+        // --- Work Log Excel File Fixer Functions ---
+        // Helper function to format time values to HH:MM AM/PM strings for Work Log Fixer
+        function formatWorkLogTimeToAMPM(timeValue) {
+            if (timeValue === null || timeValue === undefined || timeValue === '') {
+                return '';
+            }
+
+            let dateObj;
+
+            if (timeValue instanceof Date) {
+                dateObj = timeValue;
+            } else if (typeof timeValue === 'number') {
+                const hours = Math.floor(timeValue * 24);
+                const minutes = Math.floor((timeValue * 24 * 60) % 60);
+                const seconds = Math.floor((timeValue * 24 * 60 * 60) % 60);
+                dateObj = new Date(2000, 0, 1, hours, minutes, seconds); 
+            } else if (typeof timeValue === 'string') {
+                const dummyDateString = '2000-01-01T'; 
+                try {
+                    dateObj = new Date(dummyDateString + timeValue);
+                    if (isNaN(dateObj.getTime())) {
+                        const match = timeValue.match(/(\d{1,2}):(\d{2})(:\d{2})?\s*(AM|PM)?/i);
+                        if (match) {
+                            let hours = parseInt(match[1]);
+                            const minutes = parseInt(match[2]);
+                            const seconds = match[3] ? parseInt(match[3].substring(1)) : 0;
+                            const period = match[4] ? match[4].toLowerCase() : '';
+
+                            if (period === 'pm' && hours < 12) hours += 12;
+                            if (period === 'am' && hours === 12) hours = 0; 
+                            dateObj = new Date(2000, 0, 1, hours, minutes, seconds); 
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Failed to parse time string '${timeValue}':`, e);
+                    return String(timeValue);
+                }
+            } else {
+                return String(timeValue);
+            }
+
+            if (! (dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+                console.warn(`Could not convert '${timeValue}' to valid Date object for formatting.`);
+                return String(timeValue);
+            }
+            return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+
+        function processWorkLogFixerData(data) {
+            const requiredColumns = ['Employee', 'Date', 'Start Time', 'End Time', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.', 'workLogFixer');
+                return;
+            }
+            
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`, 'workLogFixer');
+                return;
+            }
+
+            const cleanedData = data.map(row => {
+                const newRow = { ...row };
+                
+                if (typeof newRow.Employee === 'string' && !newRow.Employee.endsWith(' ')) {
+                    newRow.Employee = newRow.Employee + ' ';
+                }
+
+                if (newRow.Date) {
+                    let dateObj;
+                    if (newRow.Date instanceof Date) {
+                        dateObj = newRow.Date;
+                    } else if (typeof newRow.Date === 'number') { 
+                        dateObj = new Date(Math.round((newRow.Date - 25569) * 86400 * 1000));
+                    } else {
+                        dateObj = new Date(newRow.Date);
+                    }
+
+                    if (dateObj instanceof Date && !isNaN(dateObj)) {
+                        newRow.Date = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+                    } else {
+                        console.warn(`Could not reformat Date for row: ${JSON.stringify(row)}. Keeping original: ${newRow.Date}`);
+                    }
+                }
+
+                newRow['Start Time'] = formatWorkLogTimeToAMPM(newRow['Start Time']);
+                newRow['End Time'] = formatWorkLogTimeToAMPM(newRow['End Time']);
+
+                if (typeof newRow['Activity Duration'] === 'string') {
+                    newRow['Activity Duration'] = newRow['Activity Duration'].replace(/(Worked for)(\d+h)/i, '$1 $2');
+                }
+
+                return newRow;
+            });
+
+            downloadWorkLogFixedFile(cleanedData);
+        }
+
+        function downloadWorkLogFixedFile(data) {
+            const outputHeaders = ['Employee', 'Date', 'Start Time', 'End Time', 'Activity Duration'];
+            const ws = XLSX.utils.json_to_sheet(data, { header: outputHeaders });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Fixed Data");
+
+            let dateForFilename = '';
+            if (data.length > 0 && data[0].Date) {
+                try {
+                    const parsedDate = new Date(data[0].Date);
+                    if (!isNaN(parsedDate)) {
+                        dateForFilename = parsedDate.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn("Could not parse date from cleaned data for filename. Falling back to today's date.");
+                }
+            }
+            if (!dateForFilename) {
+                dateForFilename = new Date().toISOString().split('T')[0];
+            }
+            
+            const outputFilename = `Fixed-Work-log-Activity-${dateForFilename}.xlsx`;
+
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+            saveAs(blob, outputFilename);
+            updateFileInfo(`Successfully processed and downloaded '${outputFilename}'.`, 'workLogFixer');
+        }
+
+        // --- Work Log Analyzer Functions ---
+        function parseWorkLogActivityDurationString(activityString) {
+            if (typeof activityString !== 'string' || activityString.trim() === '') {
+                return null;
+            }
+            const match = activityString.match(/(\d+)\s*h\s*(\d+)\s*m(?:\s*(\d+)\s*s)?/i);
+            if (match) {
+                const hours = parseInt(match[1] || 0);
+                const minutes = parseInt(match[2] || 0);
+                const seconds = parseInt(match[3] || 0);
+                return hours + (minutes / 60) + (seconds / 3600);
+            }
+            return null;
+        }
+
+        function processWorkLogAnalyzerData(data) {
+            const requiredColumns = ['Employee', 'Date', 'Start Time', 'End Time', 'Activity Duration']; 
+            if (data.length === 0) {
+                showError('The uploaded file is empty or contains no data rows.', 'workLogAnalyzer');
+                return;
+            }
+            
+            const actualColumns = Object.keys(data[0]);
+            const normalizedActualColumns = actualColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+            const normalizedRequiredColumns = requiredColumns.map(col => col.toLowerCase().replace(/\s/g, ''));
+
+            const hasAllColumns = normalizedRequiredColumns.every(reqCol => normalizedActualColumns.includes(reqCol));
+            if (!hasAllColumns) {
+                showError(`Missing required columns. Please ensure your file contains: ${requiredColumns.join(', ')}.`, 'workLogAnalyzer');
+                return;
+            }
+
+            const employeeData = {};
+
+            data.forEach(row => {
+                const employee = row.Employee;
+                
+                let dateObj = row.Date instanceof Date ? row.Date : new Date(row.Date);
+                if (isNaN(dateObj)) {
+                    if (typeof row.Date === 'number') {
+                        dateObj = new Date(Math.round((row.Date - 25569) * 86400 * 1000));
+                    } else {
+                        console.warn(`Could not parse date for employee ${employee}: ${row.Date}`);
+                        return;
+                    }
+                }
+                const date = dateObj.toISOString().split('T')[0];
+                const key = `${employee}_${date}`;
+
+                if (!employeeData[key]) {
+                    employeeData[key] = {
+                        employee,
+                        date,
+                        activities: [],
+                        workedCount: 0,
+                        systemLockedCount: 0,
+                        tookBreakCount: 0,
+                        systemSuspendedCount: 0,
+                        internetInterruptedCount: 0,
+                        totalWorkingTime: 0,
+                        workDuration: 0,
+                        idleTime: 0,
+                    };
+                }
+
+                const parseTime = (timeValue) => {
+                    if (timeValue instanceof Date) {
+                        return timeValue;
+                    } else if (typeof timeValue === 'number') {
+                        const hours = Math.floor(timeValue * 24);
+                        const minutes = Math.floor((timeValue * 24 * 60) % 60);
+                        const seconds = Math.floor((timeValue * 24 * 60 * 60) % 60);
+                        return new Date(1900, 0, 1, hours, minutes, seconds); 
+                    } else if (typeof timeValue === 'string' && timeValue.trim() !== '' && timeValue.trim() !== '-') {
+                        const dummyDate = new Date(); 
+                        const timeStringMatch = timeValue.match(/(\d{1,2}):(\d{2})(:\d{2})?\s*(AM|PM)?/i);
+                        if (timeStringMatch) {
+                            let hours = parseInt(timeStringMatch[1]);
+                            const minutes = parseInt(timeStringMatch[2]);
+                            const seconds = timeStringMatch[3] ? parseInt(timeStringMatch[3].substring(1)) : 0;
+                            const period = timeStringMatch[4] ? timeStringMatch[4].toLowerCase() : '';
+
+                            if (period === 'pm' && hours < 12) hours += 12;
+                            if (period === 'am' && hours === 12) hours = 0; 
+                            
+                            dummyDate.setHours(hours, minutes, seconds);
+                            return dummyDate;
+                        } else {
+                             const [h, m, s] = timeValue.split(':').map(Number);
+                             if (!isNaN(h) && !isNaN(m)) {
+                                 dummyDate.setHours(h, m, isNaN(s) ? 0 : s);
+                                 return dummyDate;
+                             }
+                        }
+                    }
+                    return null; 
+                };
+
+                const startTime = parseTime(row['Start Time']);
+                const endTime = parseTime(row['End Time']);
+                
+                if (!startTime || !endTime) {
+                    console.warn(`Could not parse time for employee ${employee} on ${date}: Start Time '${row['Start Time']}', End Time '${row['End Time']}'. Skipping row.`);
+                    return;
+                }
+
+                const adjustedEndTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), endTime.getHours(), endTime.getMinutes(), endTime.getSeconds());
+                const adjustedStartTime = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), startTime.getHours(), startTime.getMinutes(), startTime.getSeconds());
+
+                if (adjustedEndTime < adjustedStartTime) {
+                    adjustedEndTime.setDate(adjustedEndTime.getDate() + 1);
+                }
+
+                const durationHoursFromStartEnd = (adjustedEndTime - adjustedStartTime) / (1000 * 60 * 60);
+                
+                if (durationHoursFromStartEnd > 0) {
+                    employeeData[key].totalWorkingTime += durationHoursFromStartEnd;
+                }
+                
+                const activityText = String(row['Activity Duration']).toLowerCase().trim(); 
+                let specificActivityDuration = parseWorkLogActivityDurationString(activityText);
+
+                if (activityText.includes('worked for')) { 
+                    employeeData[key].workedCount++;
+                    employeeData[key].workDuration += (specificActivityDuration !== null ? specificActivityDuration : durationHoursFromStartEnd);
+                } else if (activityText.includes('system locked')) { 
+                    employeeData[key].systemLockedCount++;
+                } else if (activityText.includes('took a break')) { 
+                    employeeData[key].tookBreakCount++;
+                    employeeData[key].idleTime += (specificActivityDuration !== null ? specificActivityDuration : durationHoursFromStartEnd);
+                } else if (activityText.includes('system suspended')) { 
+                    employeeData[key].systemSuspendedCount++;
+                } else if (activityText.includes('internet interrupted')) { 
+                    employeeData[key].internetInterruptedCount++;
+                }
+            });
+            
+            displayWorkLogAnalyzerResults(employeeData);
+        }
+
+        function displayWorkLogAnalyzerResults(employeeData) {
+            resultsGridWorkLogAnalyzer.innerHTML = '';
+            if (Object.keys(employeeData).length === 0) {
+                showError('No valid data found to process and display.', 'workLogAnalyzer');
+                return;
+            }
+
+            const sortedKeys = Object.keys(employeeData).sort((a, b) => {
+                const [empA, dateA] = a.split('_');
+                const [empB, dateB] = b.split('_');
+                if (empA !== empB) return empA.localeCompare(empB);
+                return dateA.localeCompare(dateB);
+            });
+
+            sortedKeys.forEach(key => {
+                const data = employeeData[key];
+                const card = resultCardTemplateWorkLogAnalyzer.content.cloneNode(true).firstElementChild;
+                
+                const avgIdleTime = data.tookBreakCount > 0 ? (data.idleTime / data.tookBreakCount).toFixed(2) + ' hours' : 'N/A';
+
+                card.querySelector('.employee-name').textContent = data.employee;
+                card.querySelector('.report-date').textContent = data.date;
+                card.querySelector('.worked-count').textContent = data.workedCount;
+                card.querySelector('.system-locked-count').textContent = data.systemLockedCount;
+                card.querySelector('.took-break-count').textContent = data.tookBreakCount;
+                card.querySelector('.system-suspended-count').textContent = data.systemSuspendedCount;
+                card.querySelector('.internet-interrupted-count').textContent = data.internetInterruptedCount;
+                card.querySelector('.avg-idle-time').textContent = avgIdleTime;
+                
+                resultsGridWorkLogAnalyzer.appendChild(card);
+                
+                createWorkLogChart(card.querySelector('canvas'), data);
+                setTimeout(() => {
+                    generateAndDownloadWorkLogPdf(card, data.employee, data.date);
+                }, 100); 
+            });
+        }
+
+        function createWorkLogChart(canvas, data) {
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: [`${data.employee} (${data.date})`],
+                    datasets: [
+                        {
+                            label: 'Total Working Time (h)',
+                            data: [data.totalWorkingTime.toFixed(2)],
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Work Duration (h)',
+                            data: [data.workDuration.toFixed(2)],
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Idle Time (h)',
+                            data: [data.idleTime.toFixed(2)],
+                            backgroundColor: 'rgba(249, 115, 22, 0.7)',
+                            borderColor: 'rgba(249, 115, 22, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Hours'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        async function generateAndDownloadWorkLogPdf(element, employeeName, date) {
+            try {
+                const canvas = await html2canvas(element, { 
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                
+                const safeEmployeeName = employeeName.replace(/ /g, '_');
+                const fileName = `time_summary_${safeEmployeeName}_${date}.pdf`;
+                pdf.save(fileName);
+
+            } catch(error) {
+                console.error('Failed to generate Work Log PDF for', employeeName, ':', error);
+            }
+        }
+
+        // --- Event Listeners ---
+        showAppSiteFixerBtn.addEventListener('click', showAppSiteFixerMode);
+        showAppSiteAnalyzerBtn.addEventListener('click', showAppSiteAnalyzerMode);
+        showWorkLogFixerBtn.addEventListener('click', showWorkLogFixerMode);
+        showWorkLogAnalyzerBtn.addEventListener('click', showWorkLogAnalyzerMode);
+
+        // App/Site Fixer section file handling
+        appSiteFixerDropZone.addEventListener('click', () => appSiteFixerFileInput.click());
+        appSiteFixerDropZone.addEventListener('dragover', (e) => { e.preventDefault(); appSiteFixerDropZone.classList.add('border-indigo-600', 'bg-indigo-50'); });
+        appSiteFixerDropZone.addEventListener('dragleave', (e) => { e.preventDefault(); appSiteFixerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); });
+        appSiteFixerDropZone.addEventListener('drop', (e) => { e.preventDefault(); appSiteFixerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); const files = e.dataTransfer.files; if (files.length) { handleFile(files[0], 'appSiteFixer'); } });
+        appSiteFixerFileInput.addEventListener('change', (e) => { if (e.target.files.length) { handleFile(e.target.files[0], 'appSiteFixer'); } });
+
+        // App/Site Analyzer section file handling
+        appSiteAnalyzerDropZone.addEventListener('click', () => appSiteAnalyzerFileInput.click());
+        appSiteAnalyzerDropZone.addEventListener('dragover', (e) => { e.preventDefault(); appSiteAnalyzerDropZone.classList.add('border-indigo-600', 'bg-indigo-50'); });
+        appSiteAnalyzerDropZone.addEventListener('dragleave', (e) => { e.preventDefault(); appSiteAnalyzerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); });
+        appSiteAnalyzerDropZone.addEventListener('drop', (e) => { e.preventDefault(); appSiteAnalyzerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); const files = e.dataTransfer.files; if (files.length) { handleFile(files[0], 'appSiteAnalyzer'); } });
+        appSiteAnalyzerFileInput.addEventListener('change', (e) => { if (e.target.files.length) { handleFile(e.target.files[0], 'appSiteAnalyzer'); } });
+
+        // Work Log Fixer section file handling
+        workLogFixerDropZone.addEventListener('click', () => workLogFixerFileInput.click());
+        workLogFixerDropZone.addEventListener('dragover', (e) => { e.preventDefault(); workLogFixerDropZone.classList.add('border-indigo-600', 'bg-indigo-50'); });
+        workLogFixerDropZone.addEventListener('dragleave', (e) => { e.preventDefault(); workLogFixerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); });
+        workLogFixerDropZone.addEventListener('drop', (e) => { e.preventDefault(); workLogFixerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); const files = e.dataTransfer.files; if (files.length) { handleFile(files[0], 'workLogFixer'); } });
+        workLogFixerFileInput.addEventListener('change', (e) => { if (e.target.files.length) { handleFile(e.target.files[0], 'workLogFixer'); } });
+
+        // Work Log Analyzer section file handling
+        workLogAnalyzerDropZone.addEventListener('click', () => workLogAnalyzerFileInput.click());
+        workLogAnalyzerDropZone.addEventListener('dragover', (e) => { e.preventDefault(); workLogAnalyzerDropZone.classList.add('border-indigo-600', 'bg-indigo-50'); });
+        workLogAnalyzerDropZone.addEventListener('dragleave', (e) => { e.preventDefault(); workLogAnalyzerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); });
+        workLogAnalyzerDropZone.addEventListener('drop', (e) => { e.preventDefault(); workLogAnalyzerDropZone.classList.remove('border-indigo-600', 'bg-indigo-50'); const files = e.dataTransfer.files; if (files.length) { handleFile(files[0], 'workLogAnalyzer'); } });
+        workLogAnalyzerFileInput.addEventListener('change', (e) => { if (e.target.files.length) { handleFile(e.target.files[0], 'workLogAnalyzer'); } });
+
+        // Initialize with the first mode shown
+        showAppSiteFixerMode();
+    </script>
+</body>
+</html>
