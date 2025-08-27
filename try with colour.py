@@ -1,0 +1,218 @@
+import tkinter as tk
+from tkinter import messagebox
+import datetime
+
+def get_religious_holidays(year):
+    """
+    Returns a dictionary of religious holidays for a given year.
+    Note: These dates are approximations and may vary.
+    """
+    holidays = {
+        2025: {
+            "Eid-ul-Fitr": datetime.date(2025, 3, 31),
+            "Eid-ul-Adha": datetime.date(2025, 6, 7),
+            "Durga Puja": datetime.date(2025, 10, 1),
+            "Buddha Purnima": datetime.date(2025, 5, 12),
+            "Christmas Day": datetime.date(2025, 12, 25),
+            "Ashura": datetime.date(2025, 7, 6),
+            "Easter Sunday": datetime.date(2025, 4, 20),
+            "Shab-e-Barat": datetime.date(2025, 3, 15),
+            "Shab-e-Qadr": datetime.date(2025, 4, 25),
+            "Janmashtami": datetime.date(2025, 8, 15),
+            "Prophet's Birthday": datetime.date(2025, 9, 5)
+        },
+        2026: {
+            "Eid-ul-Fitr": datetime.date(2026, 3, 20),
+            "Eid-ul-Adha": datetime.date(2026, 5, 27),
+            "Durga Puja": datetime.date(2026, 10, 20),
+            "Buddha Purnima": datetime.date(2026, 5, 1),
+            "Christmas Day": datetime.date(2026, 12, 25),
+            "Ashura": datetime.date(2026, 6, 25),
+            "Easter Sunday": datetime.date(2026, 4, 5),
+            "Shab-e-Barat": datetime.date(2026, 3, 5),
+            "Shab-e-Qadr": datetime.date(2026, 4, 15),
+            "Janmashtami": datetime.date(2026, 9, 4),
+            "Prophet's Birthday": datetime.date(2026, 8, 25)
+        },
+        2027: {
+            "Eid-ul-Fitr": datetime.date(2027, 3, 9),
+            "Eid-ul-Adha": datetime.date(2027, 5, 16),
+            "Durga Puja": datetime.date(2027, 10, 8),
+            "Buddha Purnima": datetime.date(2027, 5, 19),
+            "Christmas Day": datetime.date(2027, 12, 25),
+            "Ashura": datetime.date(2027, 6, 15),
+            "Easter Sunday": datetime.date(2027, 3, 28),
+            "Janmashtami": datetime.date(2027, 8, 24),
+            "Prophet's Birthday": datetime.date(2027, 8, 14),
+            "Shab-e-Barat": datetime.date(2027, 2, 22),
+            "Shab-e-Qadr": datetime.date(2027, 3, 31)
+        },
+        2028: {
+            "Eid-ul-Fitr": datetime.date(2028, 2, 26),
+            "Eid-ul-Adha": datetime.date(2028, 5, 5),
+            "Durga Puja": datetime.date(2028, 10, 8),
+            "Buddha Purnima": datetime.date(2028, 5, 19),
+            "Christmas Day": datetime.date(2028, 12, 25),
+            "Ashura": datetime.date(2028, 6, 3),
+            "Easter Sunday": datetime.date(2028, 4, 16),
+            "Janmashtami": datetime.date(2028, 8, 24),
+            "Prophet's Birthday": datetime.date(2028, 8, 3),
+            "Shab-e-Barat": datetime.date(2028, 2, 11),
+            "Shab-e-Qadr": datetime.date(2028, 3, 22)
+        },
+        2029: {
+            "Eid-ul-Fitr": datetime.date(2029, 2, 14),
+            "Eid-ul-Adha": datetime.date(2029, 4, 24),
+            "Durga Puja": datetime.date(2029, 10, 8),
+            "Buddha Purnima": datetime.date(2029, 5, 19),
+            "Christmas Day": datetime.date(2029, 12, 25),
+            "Ashura": datetime.date(2029, 5, 23),
+            "Easter Sunday": datetime.date(2029, 4, 1),
+            "Janmashtami": datetime.date(2029, 8, 24),
+            "Prophet's Birthday": datetime.date(2029, 7, 24),
+            "Shab-e-Barat": datetime.date(2029, 1, 31),
+            "Shab-e-Qadr": datetime.date(2029, 2, 28)
+        },
+        2030: {
+            "Eid-ul-Fitr": datetime.date(2030, 2, 5),
+            "Eid-ul-Adha": datetime.date(2030, 4, 14),
+            "Durga Puja": datetime.date(2030, 10, 26),
+            "Buddha Purnima": datetime.date(2030, 5, 8),
+            "Christmas Day": datetime.date(2030, 12, 25),
+            "Ashura": datetime.date(2030, 5, 12),
+            "Easter Sunday": datetime.date(2030, 4, 21),
+            "Janmashtami": datetime.date(2030, 9, 12),
+            "Prophet's Birthday": datetime.date(2030, 7, 13),
+            "Shab-e-Barat": datetime.date(2030, 1, 20),
+            "Shab-e-Qadr": datetime.date(2030, 1, 29)
+        }
+    }
+    return holidays.get(year, {})
+
+def is_peak_season(date):
+    """Checks if a given date falls within the peak season (March to August)."""
+    return 3 <= date.month <= 8
+
+def calculate_holidays():
+    """
+    Calculates and displays the holiday forecast as a chart on the canvas.
+    """
+    MAX_HOLIDAYS = 11
+    
+    try:
+        year = int(year_entry.get())
+    except ValueError:
+        messagebox.showerror("Invalid Input", "Please enter a valid year.")
+        return
+
+    given_holidays = 0
+    
+    # --- Get and sort holidays for the specified year ---
+    all_holidays = get_religious_holidays(year)
+    if not all_holidays:
+        messagebox.showinfo("No Data", f"No holiday data available for the year {year}. Exiting.")
+        return
+
+    sorted_holidays = sorted(all_holidays.items(), key=lambda item: item[1])
+    holidays_to_give = MAX_HOLIDAYS - given_holidays
+    given_holiday_list = []
+    
+    # Clear previous drawings from the canvas
+    chart_canvas.delete("all")
+
+    if holidays_to_give > 0:
+        # --- Separate holidays into peak and non-peak season lists ---
+        peak_season_holidays = [h for h in sorted_holidays if is_peak_season(h[1])]
+        non_peak_season_holidays = [h for h in sorted_holidays if not is_peak_season(h[1])]
+
+        for holiday in peak_season_holidays:
+            if holidays_to_give > 0:
+                given_holiday_list.append(holiday)
+                holidays_to_give -= 1
+            else:
+                break
+        
+        for holiday in non_peak_season_holidays:
+            if holidays_to_give > 0:
+                given_holiday_list.append(holiday)
+                holidays_to_give -= 1
+            else:
+                break
+
+        # --- Display the final list as a chart on the canvas ---
+        if given_holiday_list:
+            final_list = sorted(given_holiday_list, key=lambda item: item[1])
+            
+            y_offset = 20 # Starting Y position for the first bar
+            bar_height = 30
+            spacing = 10
+            
+            # Draw header text
+            chart_canvas.create_text(
+                10, y_offset, anchor="nw", font=("Helvetica", 12, "bold"), 
+                text=f"Final List of Holidays to be given ({year}):"
+            )
+            y_offset += 30
+
+            for holiday_name, holiday_date in final_list:
+                formatted_date = holiday_date.strftime('%b %d')
+                
+                # Determine color based on season
+                color = "red" if is_peak_season(holiday_date) else "green"
+                
+                # Draw the bar and text
+                chart_canvas.create_rectangle(
+                    10, y_offset, 
+                    chart_canvas.winfo_width() - 20, y_offset + bar_height,
+                    fill=color, outline=""
+                )
+                chart_canvas.create_text(
+                    20, y_offset + bar_height/2, anchor="w", 
+                    text=f"{holiday_name} ({formatted_date})", 
+                    font=("Helvetica", 10), fill="white"
+                )
+                
+                y_offset += bar_height + spacing
+        else:
+            chart_canvas.create_text(
+                chart_canvas.winfo_width()/2, chart_canvas.winfo_height()/2, 
+                text="\nNo more holidays need to be given.", 
+                font=("Helvetica", 12), justify="center"
+            )
+    else:
+        chart_canvas.create_text(
+            chart_canvas.winfo_width()/2, chart_canvas.winfo_height()/2, 
+            text="\nNo more holidays need to be given.", 
+            font=("Helvetica", 12), justify="center"
+        )
+    
+# --- GUI Setup ---
+root = tk.Tk()
+root.title("Holiday Calendar Forecast")
+root.geometry("500x400")
+
+# Input Frame
+input_frame = tk.Frame(root, padx=10, pady=10)
+input_frame.pack()
+
+# Year Input
+tk.Label(input_frame, text="Enter the year:", font=("Helvetica", 12)).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+year_entry = tk.Entry(input_frame, width=15, font=("Helvetica", 12))
+year_entry.grid(row=0, column=1, padx=5, pady=5)
+year_entry.insert(0, str(datetime.datetime.now().year))
+
+# Button to trigger calculation
+calculate_button = tk.Button(root, text="Calculate Holidays", command=calculate_holidays, font=("Helvetica", 12, "bold"))
+calculate_button.pack(pady=10)
+
+# Output Canvas for the chart
+chart_canvas = tk.Canvas(root, height=250, width=480, bg="white", highlightthickness=1, highlightbackground="black")
+chart_canvas.pack(padx=10, pady=10)
+
+# A function to redraw the chart on window resize
+def on_resize(event):
+    calculate_holidays()
+
+chart_canvas.bind("<Configure>", on_resize)
+
+root.mainloop()
