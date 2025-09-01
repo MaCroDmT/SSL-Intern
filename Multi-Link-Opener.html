@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Link Opener</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Container -->
+    <div class="bg-white p-6 md:p-10 rounded-xl shadow-lg w-full max-w-xl text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Multi-Link Opener</h1>
+        <p class="text-gray-600 mb-6">Enter website links below, one per line, and click the button to open them all at once.</p>
+
+        <!-- Input Area for Links -->
+        <textarea id="linkInput" rows="10"
+            class="w-full p-4 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 text-gray-800"
+            placeholder="e.g.,
+https://www.google.com
+https://www.youtube.com
+https://github.com"></textarea>
+        
+        <!-- Action Button -->
+        <button id="openLinksBtn"
+            class="mt-6 w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            Open All Links
+        </button>
+
+        <!-- Message Box for Feedback -->
+        <div id="messageBox" class="mt-4 p-4 rounded-lg bg-red-100 border border-red-400 text-red-700">
+            <span id="messageText"></span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const linkInput = document.getElementById('linkInput');
+            const openLinksBtn = document.getElementById('openLinksBtn');
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+
+            openLinksBtn.addEventListener('click', () => {
+                const links = linkInput.value.split('\n').map(link => link.trim()).filter(link => link !== '');
+
+                // Ensure the message box is visible for all feedback
+                messageBox.classList.remove('hidden');
+
+                if (links.length === 0) {
+                    showMessage("Please enter at least one valid website link.", "bg-red-100 border-red-400 text-red-700");
+                    return;
+                }
+
+                // Clear any previous messages
+                hideMessage();
+
+                let openedCount = 0;
+                let blockedCount = 0;
+
+                links.forEach(link => {
+                    // Simple check to ensure link starts with http or https
+                    if (link.startsWith('http://') || link.startsWith('https://')) {
+                        try {
+                            const newTab = window.open(link, '_blank');
+                            if (newTab) {
+                                openedCount++;
+                            } else {
+                                // This block is for pop-up blockers
+                                blockedCount++;
+                            }
+                        } catch (e) {
+                            // This might catch security errors, though unlikely in most browsers
+                            blockedCount++;
+                        }
+                    } else {
+                        // For links without a protocol, add https://
+                        try {
+                            const newTab = window.open(`https://${link}`, '_blank');
+                             if (newTab) {
+                                openedCount++;
+                            } else {
+                                blockedCount++;
+                            }
+                        } catch (e) {
+                            blockedCount++;
+                        }
+                    }
+                });
+
+                if (blockedCount > 0) {
+                     showMessage(`Successfully opened ${openedCount} link(s). The browser's pop-up blocker may have prevented some links from opening.`, "bg-yellow-100 border-yellow-400 text-yellow-700");
+                } else {
+                    showMessage(`Successfully opened all ${openedCount} links!`, "bg-green-100 border-green-400 text-green-700");
+                }
+            });
+
+            function showMessage(text, classes) {
+                messageBox.classList.remove('bg-red-100', 'border-red-400', 'text-red-700', 'bg-yellow-100', 'border-yellow-400', 'text-yellow-700', 'bg-green-100', 'border-green-400', 'text-green-700');
+                messageBox.classList.add(...classes.split(' '));
+                messageText.textContent = text;
+            }
+
+            function hideMessage() {
+                // Keep the box visible but clear text and change to a neutral color
+                messageBox.classList.remove('bg-red-100', 'border-red-400', 'text-red-700', 'bg-yellow-100', 'border-yellow-400', 'text-yellow-700', 'bg-green-100', 'border-green-400', 'text-green-700');
+                messageBox.classList.add('bg-gray-200', 'border-gray-300', 'text-gray-800');
+                messageText.textContent = "Processing links...";
+            }
+        });
+    </script>
+</body>
+</html>
