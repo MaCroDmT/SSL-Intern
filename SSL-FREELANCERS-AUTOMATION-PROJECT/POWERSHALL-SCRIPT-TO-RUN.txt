@@ -1,0 +1,13 @@
+Before running this script Please make sure You Opened up the power shall as "Run as Administrator"
+
+
+At first paste these into the PowerShell
+
+$env:ERP_USERNAME = "prottoy"
+$env:ERP_PASSWORD = "12345"
+
+C:\Users\DELL\AppData\Local\Programs\Python\Python313\python.exe C:\Users\DELL\Downloads\erp_login.py
+
+
+
+
