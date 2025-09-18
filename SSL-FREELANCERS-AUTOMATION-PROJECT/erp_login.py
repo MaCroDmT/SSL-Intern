@@ -1,130 +1,91 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
-import time
-import traceback
+from selenium.webdriver.firefox.service import Service
+import time, traceback
 
-# ---------- Config ----------
-LOGIN_PAGE = "http://182.160.125.188:8080/erp/login.php"
-service = Service()  # assumes geckodriver in PATH
+# Setup Firefox
+service = Service()  # Will use geckodriver from PATH
 driver = webdriver.Firefox(service=service)
+driver.maximize_window()
 wait = WebDriverWait(driver, 20)
 
-# Credentials from environment
-username = os.environ.get("ERP_USERNAME")
-password = os.environ.get("ERP_PASSWORD")
-if not username or not password:
-    raise ValueError("Set environment variables ERP_USERNAME and ERP_PASSWORD before running.")
-
-def find_with_fallback(tries):
-    """tries: list of (By, value) - returns first clickable element found"""
-    for by, val in tries:
-        try:
-            el = wait.until(EC.element_to_be_clickable((by, val)))
-            return el
-        except Exception:
-            continue
-    return None
-
-def login_success_condition(d):
-    """Return True if we detect successful login (URL change or dashboard element present)."""
-    try:
-        if d.current_url and d.current_url.rstrip("/") != LOGIN_PAGE.rstrip("/"):
-            return True
-        # look for a known dashboard element - adapt if yours is different
-        try:
-            d.find_element(By.LINK_TEXT, "Merchandising")
-            return True
-        except Exception:
-            pass
-        try:
-            d.find_element(By.XPATH, "//h1[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'),'platform')]")
-            return True
-        except Exception:
-            pass
-    except Exception:
-        pass
-    return False
-
 try:
-    driver.get(LOGIN_PAGE)
-    print("Opened login page:", LOGIN_PAGE)
+    # --- Login ---
+    driver.get("http://182.160.125.188:8080/erp/login.php")
+    driver.find_element(By.ID, "txt_userid").send_keys("prottoy")
+    driver.find_element(By.ID, "txt_password").send_keys("12345")
+    driver.find_element(By.ID, "submit").click()
+    print("Logged in.")
 
-    # Find username field (fall back through common attributes)
-    username_field = find_with_fallback([
-        (By.NAME, "txt_userid"),
-        (By.ID, "txt_userid"),
-        (By.CLASS_NAME, "user_name"),
-        (By.CSS_SELECTOR, "input[placeholder='User Name']"),
-        (By.CSS_SELECTOR, "input[type='text']")
-    ])
-    if not username_field:
-        raise RuntimeError("Username field not found (tried txt_userid / id / class / placeholder).")
-    username_field.clear()
-    username_field.send_keys(username)
-    print("Username entered.")
+    # --- Step 1: Open Merchandising ---
+    merch = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Merchandising")))
+    merch.click()
+    print("Opened Merchandising.")
 
-    # Find password field
-    password_field = find_with_fallback([
-        (By.NAME, "txt_password"),
-        (By.ID, "txt_password"),
-        (By.CLASS_NAME, "password"),
-        (By.CSS_SELECTOR, "input[placeholder='Password']"),
-        (By.CSS_SELECTOR, "input[type='password']")
-    ])
-    if not password_field:
-        raise RuntimeError("Password field not found (tried txt_password / id / class / placeholder).")
-    password_field.clear()
-    password_field.send_keys(password)
-    print("Password entered.")
+    # --- Step 2: Expand Sweater Garments submenu ---
+    sweater_toggle = wait.until(
+        EC.presence_of_element_located(
+            (By.XPATH, "//span[contains(normalize-space(.), 'Sweater Garments')]")
+        )
+    )
+    driver.execute_script("arguments[0].click();", sweater_toggle)
+    print("Expanded Sweater Garments menu.")
 
-    # Find & click the login button (with fallbacks)
-    login_btn = find_with_fallback([
-        (By.ID, "submit"),
-        (By.NAME, "submit"),
-        (By.CLASS_NAME, "login"),
-        (By.CSS_SELECTOR, "input[type='submit']"),
-        (By.CSS_SELECTOR, "button[type='submit']")
-    ])
-    if not login_btn:
-        raise RuntimeError("Login button not found.")
-    try:
-        login_btn.click()
-    except Exception:
-        # fallback to javascript click if normal click fails
-        driver.execute_script("arguments[0].click();", login_btn)
-    print("Login button clicked.")
+    # --- Step 3: Expand Order Tracking submenu ---
+    order_toggle = wait.until(
+        EC.presence_of_element_located(
+            (By.XPATH, "//span[contains(normalize-space(.), 'Order Tracking')]")
+        )
+    )
+    driver.execute_script("arguments[0].click();", order_toggle)
+    print("Expanded Order Tracking menu.")
 
-    # Wait for login success: URL change or dashboard element
-    wait.until(login_success_condition)
-    print("Login seems successful (URL changed or dashboard element detected).")
+    # --- Step 4: Click Pre-Costing [BOM] ---
+    pre_costing = wait.until(
+        EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Pre-Costing [BOM]')]"))
+    )
+    driver.execute_script("arguments[0].click();", pre_costing)
+    print("Opened Pre-Costing [BOM].")
 
-    # Example: click Merchandising if present
-    try:
-        merch = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Merchandising")))
-        merch.click()
-        print("Clicked 'Merchandising'.")
-    except Exception:
-        print("Merchandising link not found or clickable — continuing.")
+    # --- Step 5: Double-click Job No field ---
+    job_no = wait.until(EC.element_to_be_clickable((By.ID, "txt_job_no")))
+    driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('dblclick', {bubbles: true}));", job_no)
+    print("Double-clicked Job No.")
+
+    # --- NEW CODE TO BE ADDED ---
+
+    # Wait for the popup/modal to appear. This is the crucial missing step.
+    # The company dropdown is inside the popup, so we must wait for it to be present.
+    wait.until(EC.visibility_of_element_located((By.ID, "cbo_company_mst")))
+    print("Popup with company dropdown is now visible.")
+
+    # --- Step 6: Select company from dropdown ---
+    company_dropdown = driver.find_element(By.ID, "cbo_company_mst")
+    for option in company_dropdown.find_elements(By.TAG_NAME, "option"):
+        if "Sonia and Sweaters Ltd." in option.text:
+            option.click()
+            print("Selected 'Sonia and Sweaters Ltd.'")
+            break
+
+    # --- Step 7: Click the 'Show' button ---
+    show_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@value='Show']")))
+    show_button.click()
+    print("Clicked 'Show' button.")
+
+    # The script now waits in the final state for you to continue.
+    time.sleep(5)
 
 except Exception as e:
-    print("ERROR during automation:", str(e))
+    print("Automation FAILED:", str(e))
     traceback.print_exc()
-    # Save screenshot & partial page source for debugging
-    timestamp = int(time.time())
-    screenshot = f"error_{timestamp}.png"
-    driver.save_screenshot(screenshot)
-    print("Saved screenshot:", screenshot)
-    try:
-        with open(f"page_{timestamp}.html", "w", encoding="utf-8") as f:
-            f.write(driver.page_source[:20000])  # write first 20k chars to keep file size reasonable
-        print("Saved partial page source: page_{}.html".format(timestamp))
-    except Exception:
-        pass
+    ts = int(time.time())
+    driver.save_screenshot(f"error_{ts}.png")
+    with open(f"page_{ts}.html", "w", encoding="utf-8") as f:
+        f.write(driver.page_source)
+    print(f"Saved debug: error_{ts}.png and page_{ts}.html")
 
 finally:
     print("Automation finished.")
-    # driver.quit()   # uncomment when you are done debugging
+    # driver.quit()
